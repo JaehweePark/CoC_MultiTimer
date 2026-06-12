@@ -1,0 +1,16 @@
+{
+  "name": "장인 사령부",
+  "short_name": "장인사령부",
+  "description": "클래시 오브 클랜 멀티 계정 업그레이드 타이머",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F1A12",
+  "theme_color": "#0F1A12",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
