@@ -470,6 +470,7 @@ function CocMultiTimer() {
   const t = (k) => I18N[lang]?.[k] ?? I18N.en[k] ?? k;
   const dir = lang === "ar" ? "rtl" : "ltr";
   const adFree = promoActive(promo, now);
+  const isNative = !!(typeof window !== "undefined" && window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
   useEffect(() => {
     (async () => {
       try {
@@ -563,6 +564,12 @@ function CocMultiTimer() {
       return next;
     });
   }
+  useEffect(() => {
+    if (typeof initAds === "function") initAds();
+  }, []);
+  useEffect(() => {
+    if (typeof setBanner === "function") setBanner(!adFree);
+  }, [adFree]);
   useEffect(() => {
     const acquire = async () => {
       try {
@@ -741,7 +748,7 @@ function CocMultiTimer() {
     const resChar = costStr && costStr.includes("\xB7") ? costStr.split("\xB7")[1] : null;
     return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${r.remaining <= 0 ? "done-row" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS[r.category] } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, itemName(r.dataId), r.isSC ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, " \xB7 ", t("supercharge"), r.sc !== null ? ` ${r.sc}` : "") : r.lvl !== null ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, "\u2192", r.target, toMax && /* @__PURE__ */ React.createElement("b", { className: "maxb" }, " ", t("maxBadge")), maxKnown && !toMax ? ` \xB7 ${t("maxLbl")} ${g.m}` : "") : null), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name), costStr !== null && /* @__PURE__ */ React.createElement("span", { className: "cmt-cost" }, t("nextCost"), ": ", resChar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("b", { style: { color: RES_COLORS[resChar] } }, costStr.split("\xB7")[0]), /* @__PURE__ */ React.createElement("span", { className: "resdot", style: { background: RES_COLORS[resChar] } })) : costStr), r.helperSec && /* @__PURE__ */ React.createElement("span", { className: "cmt-helper" }, "\u2692 ", fmtDuration(Math.max(0, r.helperSec - (now - r.account.importedAt) / 1e3), lang)))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, r.remaining <= 0 ? t("doneBang") : fmtDuration(r.remaining, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
   }
-  return /* @__PURE__ */ React.createElement("div", { className: "cmt-root" + (adFree ? "" : " has-banner"), dir }, /* @__PURE__ */ React.createElement("style", null, `
+  return /* @__PURE__ */ React.createElement("div", { className: "cmt-root" + (adFree ? "" : " has-banner") + (!adFree && isNative ? " ads-native" : ""), dir }, /* @__PURE__ */ React.createElement("style", null, `
         .cmt-root { min-height: 100vh; background: radial-gradient(1200px 500px at 50% -10%, rgba(245,184,46,0.07), transparent 60%), #0F1A12;
           color: #F2EFE4; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; padding-bottom: 86px; }
         .cmt-header { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(10px);
@@ -848,6 +855,7 @@ function CocMultiTimer() {
           font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
         .cmt-banner .tag { border: 1px solid rgba(255,255,255,0.16); border-radius: 6px; padding: 2px 7px; font-size: 9.5px; }
         .cmt-root.has-banner { padding-bottom: 150px; }
+        .cmt-root.ads-native .cmt-tabbar { bottom: 50px; }
         @media (prefers-reduced-motion: reduce) { .cmt-bar > div, .cmt-sw, .cmt-sw::after { transition: none; } }
       `), /* @__PURE__ */ React.createElement("div", { className: "cmt-header" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-htitle" }, "\u2692 ", /* @__PURE__ */ React.createElement("em", null, t("appTitle"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold hdr", onClick: () => {
     openAdd();
@@ -879,7 +887,7 @@ function CocMultiTimer() {
     },
     "\u{1F514} ",
     lang === "ko" ? "1\uBD84 \uB4A4 \uD14C\uC2A4\uD2B8 \uC54C\uB9BC" : "Test notification in 1 min"
-  ))), !adFree && /* @__PURE__ */ React.createElement("div", { className: "cmt-banner" }, /* @__PURE__ */ React.createElement("span", { className: "tag" }, "AD"), t("adLabel")), /* @__PURE__ */ React.createElement("div", { className: "cmt-tabbar" }, [["timeline", "\u23F1", "tabTimeline"], ["accounts", "\u{1F465}", "tabAccounts"], ["settings", "\u2699\uFE0F", "tabSettings"]].map(([k, ic, lbl]) => /* @__PURE__ */ React.createElement("button", { key: k, className: `cmt-tab ${tab === k ? "on" : ""}`, onClick: () => {
+  ))), !adFree && !isNative && /* @__PURE__ */ React.createElement("div", { className: "cmt-banner" }, /* @__PURE__ */ React.createElement("span", { className: "tag" }, "AD"), t("adLabel")), /* @__PURE__ */ React.createElement("div", { className: "cmt-tabbar" }, [["timeline", "\u23F1", "tabTimeline"], ["accounts", "\u{1F465}", "tabAccounts"], ["settings", "\u2699\uFE0F", "tabSettings"]].map(([k, ic, lbl]) => /* @__PURE__ */ React.createElement("button", { key: k, className: `cmt-tab ${tab === k ? "on" : ""}`, onClick: () => {
     setTab(k);
     closeForm();
   } }, /* @__PURE__ */ React.createElement("span", { className: "ic" }, ic), t(lbl)))));
