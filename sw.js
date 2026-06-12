@@ -1,7 +1,7 @@
 // 서비스 워커 — PWA 알림 + 오프라인 캐시
 // iOS 홈 화면 PWA에서 로컬 예약 알림을 띄우기 위한 핵심 모듈
 
-const CACHE = "jangin-hq-v3";
+const CACHE = "jangin-hq-v4";
 
 // 오프라인 동작용 앱 셸. 동일 출처 자원만 설치 시 미리 캐시(원격 CDN은 fetch 시 지연 캐시).
 const SHELL = [
@@ -28,10 +28,23 @@ self.addEventListener("activate", (e) => {
   );
 });
 
-// stale-while-revalidate: 캐시 우선 응답(오프라인 가능) + 백그라운드로 갱신.
-// 첫 온라인 방문 때 unpkg React 등 원격 자원까지 캐시돼 이후 오프라인에서도 실행됨.
+// HTML(내비게이션)은 네트워크 우선 → 항상 최신. 실패 시 캐시(오프라인).
+// 그 외 자원은 stale-while-revalidate(빠름 + 백그라운드 갱신).
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
+  const isDoc = e.request.mode === "navigate" || e.request.destination === "document";
+  if (isDoc) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          return res;
+        })
+        .catch(() => caches.match(e.request).then((c) => c || caches.match("./index.html")))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const network = fetch(e.request)
