@@ -1,6 +1,6 @@
 {
-  "name": "장인 사령부",
-  "short_name": "장인사령부",
+  "name": "CCTimer",
+  "short_name": "CCTimer",
   "description": "클래시 오브 클랜 멀티 계정 업그레이드 타이머",
   "start_url": "./",
   "scope": "./",
