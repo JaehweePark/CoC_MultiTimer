@@ -592,6 +592,9 @@ function CocMultiTimer() {
     if (typeof setBanner === "function") setBanner(!adFree);
   }, [adFree]);
   useEffect(() => {
+    if (typeof refreshBanner === "function") refreshBanner();
+  }, [tab, catFilter]);
+  useEffect(() => {
     const acquire = async () => {
       try {
         if (keepAwake && typeof navigator !== "undefined" && "wakeLock" in navigator && document.visibilityState === "visible") {
