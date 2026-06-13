@@ -16,6 +16,87 @@
 <div id="root"></div>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>// 웹(PWA)용 구글 드라이브 appDataFolder 백업/복원 — Google Identity Services(GIS) + Drive REST.
+// build-pwa.js가 이 파일을 <script>로 주입한다(GIS 라이브러리는 HTML에서 로드).
+// 데이터 파일명(coctimer-sync.json)·폴더(appDataFolder)는 네이티브 drive.js와 동일 →
+// 아이패드(PWA)와 안드로이드(네이티브)가 같은 드라이브 폴더로 동기화된다.
+(function () {
+  var CLIENT_ID = "303614628771-8drq0a0puvpam09eieqlv2r4fostrfcg.apps.googleusercontent.com";
+  var SCOPE = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email";
+  var FILE = "coctimer-sync.json";
+  var token = null, email = null, client = null;
+
+  function ensureClient() {
+    if (client) return true;
+    if (!(window.google && google.accounts && google.accounts.oauth2)) return false;
+    client = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPE, callback: function () {} });
+    return true;
+  }
+  // prompt: "consent"(최초 동의) | ""(무인 시도, 불가하면 에러만, 팝업 안 띄움)
+  function getToken(prompt) {
+    return new Promise(function (resolve, reject) {
+      if (!ensureClient()) return reject(new Error("gis-not-loaded"));
+      client.callback = function (resp) {
+        if (resp && resp.access_token) { token = resp.access_token; resolve(token); }
+        else reject(new Error((resp && resp.error) || "no-token"));
+      };
+      client.error_callback = function (err) { reject(new Error((err && err.type) || "gis-error")); };
+      try { client.requestAccessToken({ prompt: prompt }); } catch (e) { reject(e); }
+    });
+  }
+  function fetchEmail() {
+    return fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: "Bearer " + token } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && j.email) email = j.email; })
+      .catch(function () {});
+  }
+  async function signIn() { await getToken("consent"); await fetchEmail(); return { email: email }; }
+  async function signOut() {
+    try { if (token && google.accounts.oauth2.revoke) google.accounts.oauth2.revoke(token, function () {}); } catch (e) {}
+    token = null; email = null;
+  }
+  async function status() { return { signedIn: !!token, email: email }; }
+  async function resume(savedEmail) {
+    try { await getToken(""); if (savedEmail) email = savedEmail; if (!email) await fetchEmail(); return !!token; }
+    catch (e) { return false; }
+  }
+  async function ensureToken() { if (!token) await getToken(""); }
+  async function findId() {
+    var q = encodeURIComponent("name='" + FILE + "'");
+    var r = await fetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q=" + q,
+      { headers: { Authorization: "Bearer " + token } });
+    if (!r.ok) throw new Error("drive-list-" + r.status);
+    var j = await r.json();
+    return j.files && j.files[0] ? j.files[0].id : null;
+  }
+  async function upload(jsonStr) {
+    await ensureToken();
+    var id = await findId();
+    var boundary = "cctb" + Math.random().toString(16).slice(2);
+    var meta = id ? {} : { name: FILE, parents: ["appDataFolder"] };
+    var body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(meta) +
+      "\r\n--" + boundary + "\r\nContent-Type: application/json\r\n\r\n" + jsonStr + "\r\n--" + boundary + "--";
+    var base = "https://www.googleapis.com/upload/drive/v3/files";
+    var url = id ? base + "/" + id + "?uploadType=multipart" : base + "?uploadType=multipart";
+    var r = await fetch(url, {
+      method: id ? "PATCH" : "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "multipart/related; boundary=" + boundary },
+      body: body,
+    });
+    if (!r.ok) throw new Error("drive-upload-" + r.status);
+  }
+  async function download() {
+    await ensureToken();
+    var id = await findId();
+    if (!id) return null;
+    var r = await fetch("https://www.googleapis.com/drive/v3/files/" + id + "?alt=media", { headers: { Authorization: "Bearer " + token } });
+    if (!r.ok) throw new Error("drive-download-" + r.status);
+    return await r.text();
+  }
+  window.driveSync = { available: true, web: true, signIn: signIn, signOut: signOut, status: status, upload: upload, download: download, resume: resume };
+})();
+</script>
 <script type="module">
 import { initPWA, syncNotifications } from "./notify-pwa.js";
 window.syncNotifications = syncNotifications;
