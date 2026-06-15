@@ -20,10 +20,10 @@
   .tabs{display:flex;gap:6px;margin-bottom:8px}
   .tab{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--sub);border-radius:99px;padding:7px 16px;font-weight:800;cursor:pointer}
   .tab.on{background:var(--gold);color:#1f1709;border-color:var(--gold)}
-  .row2{display:flex;gap:8px;align-items:center}
-  .row2{flex-wrap:wrap}
+  .row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .row2 input.search{flex:1;min-width:130px;padding:9px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--txt)}
-  .row2 .sortsel{padding:9px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--txt)}
+  .row2 select{padding:9px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--txt)}
+  .row2 select.lang{border-color:var(--gold);color:var(--gold);font-weight:700}
   .cats{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
   .cat{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--sub);border-radius:99px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer}
   .cat.on{background:#F2EFE4;color:#14210f;border-color:#F2EFE4}
@@ -33,6 +33,7 @@
   .item:active{background:rgba(255,255,255,.05)}
   .item .id{font-family:monospace;font-size:11px;color:var(--sub);width:64px;flex:none}
   .item .nm{flex:1;font-weight:700}.item .nm small{color:var(--sub);font-weight:400;margin-left:6px}
+  .item .nm .miss{color:#E08B8B;font-weight:400}
   .item .meta{font-size:11px;color:var(--sub);text-align:right;white-space:nowrap}
   .item.dirty{background:rgba(245,184,46,.08)}
   .item.bb .nm{color:var(--gold)}
@@ -41,6 +42,7 @@
   .modal h3{margin:0 0 4px;font-size:16px}.modal .mid{font-family:monospace;font-size:11px;color:var(--sub);margin-bottom:12px}
   .fld{margin-bottom:10px}.fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px}
   .fld input{width:100%;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:7px;color:var(--txt)}
+  .fld.base input{border-color:rgba(255,255,255,.2);color:var(--sub)}
   .costgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
   .costgrid .c{display:flex;align-items:center;gap:3px}.costgrid .c b{font-size:10px;color:var(--sub);width:28px;flex:none}
   .costgrid .c input{width:100%;padding:5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--txt);font-size:12px}
@@ -65,13 +67,15 @@
         <button class="tab" data-t="gd" onclick="switchTab('gd')">게임데이터 수정</button>
       </div>
       <div class="row2">
+        <select id="langsel" class="lang" onchange="setLang(this.value)"></select>
         <input class="search" id="q" placeholder="검색 (이름·ID)" oninput="renderList()">
-        <select id="sort" class="sortsel" onchange="setSort(this.value)">
+        <select id="sort" onchange="setSort(this.value)">
           <option value="id">ID순</option>
           <option value="name">이름순</option>
           <option value="cat">분류순</option>
           <option value="max">최대레벨순</option>
           <option value="dirty">변경먼저</option>
+          <option value="missing">번역없음먼저</option>
         </select>
         <button class="btn" id="saveBtn" onclick="saveAll()">저장</button>
         <button class="btn ghost" onclick="logout()">잠금</button>
@@ -97,16 +101,20 @@
 
 <script>
 const OWNER="JaehweePark", REPO="CoC_MultiTimer", BRANCH="main";
-const FILES={ en:"names/en.json", ko:"names/ko.json", gd:"gamedata.json" };
-let token="", shas={}, orig={en:{},ko:{},gd:{}}, rows=[], byId={}, curTab="names", curCat="", curSort="id", editId=null;
+// ▼▼ 언어 추가는 여기 LANGS 에 코드만 넣으면 됩니다(파일 없으면 editor가 자동 생성). en=기준 ▼▼
+const LANGS=["ko","en"];
+const BASE="en";
+const LANG_LABEL={ko:"한국어",en:"English",zh:"中文",ja:"日本語",de:"Deutsch",fr:"Français",es:"Español",it:"Italiano",ru:"Русский",pt:"Português",tr:"Türkçe",ar:"العربية",th:"ไทย",vi:"Tiếng Việt",id:"Indonesia",nl:"Nederlands",no:"Norsk",fi:"Suomi"};
+const GD_FILE="gamedata.json";
+const namesPath=(l)=>"names/"+l+".json";
 
-// 분류: 본마을 건물은 ID 매핑, 나머지는 ID 범위. _BB(한글 끝)는 자동 장인기지.
+let token="", shas={}, orig={gd:{}}, rows=[], byId={}, curTab="names", curCat="", curSort="id", editLang="ko", editId=null;
+
+const BB_IDS=new Set("1000033 1000034 1000035 1000036 1000037 1000038 1000039 1000040 1000041 1000042 1000043 1000044 1000045 1000046 1000048 1000049 1000050 1000051 1000052 1000053 1000054 1000055 1000056 1000057 1000058 1000063 1000065 1000078 1000080 1000081 1000082 12000010 12000011 12000013 12000014 4000031 4000032 4000033 4000034 4000035 4000036 4000037 4000038 4000041 4000042 4000070 28000003 28000005".split(" ").map(Number));
 const TOWERS=new Set("1000008 1000009 1000013 1000012 1000011 1000028 1000019 1000032 1000021 1000027 1000031 1000067 1000077 1000089 1000010 1000084 1000085 1000079 1000086 1000102".split(" ").map(Number));
 const RESOURCE=new Set("1000004 1000002 1000005 1000003 1000023 1000024".split(" ").map(Number));
 const ARMY=new Set("1000000 1000006 1000026 1000007 1000020 1000029 1000071 1000070 1000059 1000068 1000014".split(" ").map(Number));
 const CATS=["방어타워","자원","군대","함정","유닛","마법","영웅","펫","가디언","장인기지","기타건물"];
-const BB_IDS=new Set("1000033 1000034 1000035 1000036 1000037 1000038 1000039 1000040 1000041 1000042 1000043 1000044 1000045 1000046 1000048 1000049 1000050 1000051 1000052 1000053 1000054 1000055 1000056 1000057 1000058 1000063 1000065 1000078 1000080 1000081 1000082 12000010 12000011 12000013 12000014 4000031 4000032 4000033 4000034 4000035 4000036 4000037 4000038 4000041 4000042 4000070 28000003 28000005".split(" ").map(Number));
-function displayKo(r){ return BB_IDS.has(+r.id) ? String(r.ko).replace(/_BB$/,"") : r.ko; }
 function category(r){
   if(BB_IDS.has(+r.id)) return "장인기지";
   const id=+r.id;
@@ -122,22 +130,29 @@ function category(r){
   if(id>=1000000) return "기타건물";
   return "기타";
 }
+// _BB 는 한국어에서만 자동(장인기지 ID). 다른 언어는 입력값 그대로.
+function isBBlang(lang){ return lang==="ko"; }
+function disp(r,lang){ const v=r.names[lang]||""; return (isBBlang(lang)&&BB_IDS.has(+r.id))?v.replace(/_BB$/,""):v; }
 
 function b64encode(s){ return btoa(unescape(encodeURIComponent(s))); }
 function b64decode(s){ return decodeURIComponent(escape(atob(s.replace(/\s/g,"")))); }
 function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+async function ghGet(path){
+  const r=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}?ref=${BRANCH}`,{headers:{Authorization:`Bearer ${token}`,Accept:"application/vnd.github+json"}});
+  if(r.status===404) return {data:{},sha:null};
+  if(!r.ok) throw new Error(path+" "+r.status);
+  const j=await r.json(); return {data:JSON.parse(b64decode(j.content)),sha:j.sha};
+}
 
 async function enter(){
   token=document.getElementById("tok").value.trim(); if(!token) return;
   if(document.getElementById("remember").checked) localStorage.setItem("gh_token",token); else localStorage.removeItem("gh_token");
   const b=document.getElementById("enterBtn"); b.disabled=true; document.getElementById("gerr").textContent="불러오는 중…";
   try{
-    for(const [k,p] of Object.entries(FILES)){
-      const r=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${p}?ref=${BRANCH}`,{headers:{Authorization:`Bearer ${token}`,Accept:"application/vnd.github+json"}});
-      if(!r.ok) throw new Error(p+" "+r.status);
-      const j=await r.json(); shas[k]=j.sha; orig[k]=JSON.parse(b64decode(j.content));
-    }
-    buildRows(); renderCats();
+    const g=await ghGet(GD_FILE); orig.gd=g.data; shas.gd=g.sha;
+    for(const l of LANGS){ const r=await ghGet(namesPath(l)); orig[l]=r.data; shas[l]=r.sha; }
+    buildRows(); renderLangSel(); renderCats();
     document.getElementById("gate").style.display="none";
     document.getElementById("app").style.display="block";
     renderList();
@@ -146,11 +161,21 @@ async function enter(){
 }
 
 function buildRows(){
-  const ids=new Set([...Object.keys(orig.en),...Object.keys(orig.ko),...Object.keys(orig.gd)]);
-  rows=[...ids].sort((a,b)=>(+a)-(+b)).map(id=>{ const g=orig.gd[id]||{}; return { id, en:orig.en[id]||"", ko:orig.ko[id]||"", m:(g.m??""), r:(Array.isArray(g.r)?g.r.join(","):(g.r||"")), c:(g.c?g.c.slice():[]) }; });
+  const ids=new Set(Object.keys(orig.gd));
+  LANGS.forEach(l=>Object.keys(orig[l]||{}).forEach(id=>ids.add(id)));
+  rows=[...ids].sort((a,b)=>(+a)-(+b)).map(id=>{
+    const names={}; LANGS.forEach(l=>names[l]=(orig[l]&&orig[l][id])||"");
+    const g=orig.gd[id]||{};
+    return { id, names, m:(g.m??""), r:(Array.isArray(g.r)?g.r.join(","):(g.r||"")), c:(g.c?g.c.slice():[]) };
+  });
   byId={}; rows.forEach(r=>byId[r.id]=r);
 }
 
+function renderLangSel(){
+  const s=document.getElementById("langsel");
+  s.innerHTML=LANGS.map(l=>`<option value="${l}"${l===editLang?" selected":""}>${LANG_LABEL[l]||l}</option>`).join("");
+  s.style.display = curTab==="names" ? "" : "none";
+}
 function renderCats(){
   const c=document.getElementById("cats");
   const mk=(v,lbl)=>`<button class="cat${curCat===v?' on':''}" onclick="setCat('${v}')">${lbl}</button>`;
@@ -158,21 +183,27 @@ function renderCats(){
 }
 function setCat(c){ curCat=c; renderCats(); renderList(); }
 function setSort(v){ curSort=v; renderList(); }
+function setLang(v){ editLang=v; renderList(); }
+function switchTab(t){ curTab=t; document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t)); renderLangSel(); renderList(); }
+
+function gdDirty(r){
+  const og=orig.gd[r.id]||{}, or=Array.isArray(og.r)?og.r.join(","):(og.r||"");
+  return String(og.m??"")!==String(r.m) || or!==r.r || (og.c?og.c.join(","):"")!==r.c.join(",");
+}
+function dirtyOf(r){
+  for(const l of LANGS){ if(((orig[l]&&orig[l][r.id])||"")!==r.names[l]) return true; }
+  return gdDirty(r);
+}
+
 function sortedRows(){
   const a=rows.slice();
-  if(curSort==="name") a.sort((x,y)=>String(displayKo(x)||x.en).localeCompare(String(displayKo(y)||y.en),"ko"));
+  if(curSort==="name") a.sort((x,y)=>String(disp(x,editLang)||x.names[BASE]).localeCompare(String(disp(y,editLang)||y.names[BASE]),"ko"));
   else if(curSort==="cat") a.sort((x,y)=>category(x).localeCompare(category(y),"ko")||(+x.id)-(+y.id));
   else if(curSort==="max") a.sort((x,y)=>(Number(y.m)||0)-(Number(x.m)||0)||(+x.id)-(+y.id));
   else if(curSort==="dirty") a.sort((x,y)=>(dirtyOf(y)?1:0)-(dirtyOf(x)?1:0)||(+x.id)-(+y.id));
+  else if(curSort==="missing") a.sort((x,y)=>((x.names[editLang]?0:1)<(y.names[editLang]?0:1)?1:((x.names[editLang]?0:1)>(y.names[editLang]?0:1)?-1:(+x.id)-(+y.id))));
   else a.sort((x,y)=>(+x.id)-(+y.id));
   return a;
-}
-function switchTab(t){ curTab=t; document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t)); renderList(); }
-
-function dirtyOf(r){
-  if((orig.ko[r.id]||"")!==r.ko || (orig.en[r.id]||"")!==r.en) return true;
-  const og=orig.gd[r.id]||{}, or=Array.isArray(og.r)?og.r.join(","):(og.r||"");
-  return String(og.m??"")!==String(r.m) || or!==r.r || (og.c?og.c.join(","):"")!==r.c.join(",");
 }
 
 function renderList(){
@@ -182,29 +213,40 @@ function renderList(){
   sortedRows().forEach(r=>{
     const d=dirtyOf(r); if(d) dirty++;
     if(curCat && category(r)!==curCat) return;
-    if(q && !(r.ko.toLowerCase().includes(q)||r.en.toLowerCase().includes(q)||r.id.includes(q))) return;
+    if(q && !(r.id.includes(q) || LANGS.some(l=>(r.names[l]||"").toLowerCase().includes(q)))) return;
     shown++;
     const el=document.createElement("div");
     el.className="item"+(BB_IDS.has(+r.id)?" bb":"")+(d?" dirty":"");
-    const meta = curTab==="names" ? category(r) : (r.m!==""||r.c.length?`max ${esc(r.m)} · ${esc(r.r)} · 비용 ${r.c.length}`:"—");
-    el.innerHTML=`<span class="id">${r.id}</span><span class="nm">${esc(displayKo(r)||r.en)||"(이름없음)"}${r.ko&&r.en?`<small>${esc(r.en)}</small>`:""}</span><span class="meta">${meta}</span>`;
+    let nm, meta;
+    if(curTab==="names"){
+      const main=disp(r,editLang);
+      nm = main ? esc(main) : '<span class="miss">(번역 없음)</span>';
+      const base = editLang!==BASE ? (r.names[BASE]||"") : "";
+      if(base) nm += `<small>${esc(base)}</small>`;
+      meta = category(r);
+    }else{
+      nm = esc(disp(r,"ko")||r.names[BASE]||"(이름없음)");
+      meta = (r.m!==""||r.c.length)?`max ${esc(r.m)} · ${esc(r.r)} · 비용 ${r.c.length}`:"—";
+    }
+    el.innerHTML=`<span class="id">${r.id}</span><span class="nm">${nm}</span><span class="meta">${meta}</span>`;
     el.onclick=()=>openModal(r.id);
     frag.appendChild(el);
   });
   L.appendChild(frag);
-  document.getElementById("status").textContent=`${shown}개 표시 · 변경 ${dirty}개`+(dirty?" (저장 누르면 반영)":"");
+  document.getElementById("status").textContent=`${shown}개 표시 · 변경 ${dirty}개`+(dirty?" (저장 누르면 반영)":"")+(curTab==="names"?` · 편집언어: ${LANG_LABEL[editLang]||editLang}`:"");
 }
 
 function openModal(id){
   editId=id; const r=byId[id];
-  document.getElementById("mTitle").textContent=(r.ko||r.en||"(이름없음)");
+  document.getElementById("mTitle").textContent=(disp(r,editLang)||r.names[BASE]||"(이름없음)");
   document.getElementById("mId").textContent="ID "+id+" · "+category(r);
   const body=document.getElementById("mBody");
   if(curTab==="names"){
-    const bb=BB_IDS.has(+id);
-    body.innerHTML=
-      `<div class="fld"><label>영문 (en)</label><input id="f_en" value="${esc(r.en)}"></div>`+
-      `<div class="fld"><label>한글 (ko)${bb?' — 장인기지: 저장 시 _BB 자동':''}</label><input id="f_ko" value="${esc(displayKo(r))}"></div>`;
+    let html="";
+    if(editLang!==BASE) html+=`<div class="fld base"><label>${LANG_LABEL[BASE]||BASE} (기준)</label><input id="f_base" value="${esc(r.names[BASE]||"")}"></div>`;
+    const bbNote = (isBBlang(editLang)&&BB_IDS.has(+id)) ? " — 장인기지: 저장 시 _BB 자동" : "";
+    html+=`<div class="fld"><label>${LANG_LABEL[editLang]||editLang}${bbNote}</label><input id="f_lang" value="${esc(disp(r,editLang))}" autofocus></div>`;
+    body.innerHTML=html;
   }else{
     const cg=r.c.map((v,i)=>`<div class="c"><b>Lv${i+1}</b><input data-ci="${i}" value="${esc(v)}" inputmode="numeric"></div>`).join("");
     body.innerHTML=
@@ -221,10 +263,10 @@ function closeModal(){ document.getElementById("modalOv").style.display="none"; 
 function saveModal(){
   const r=byId[editId];
   if(curTab==="names"){
-    r.en=document.getElementById("f_en").value.trim();
-    let ko=document.getElementById("f_ko").value.trim();
-    if(BB_IDS.has(+editId) && ko && !ko.endsWith("_BB")) ko+="_BB";
-    r.ko=ko;
+    if(editLang!==BASE){ const fb=document.getElementById("f_base"); if(fb) r.names[BASE]=fb.value.trim(); }
+    let v=document.getElementById("f_lang").value.trim();
+    if(isBBlang(editLang) && BB_IDS.has(+editId) && v && !v.endsWith("_BB")) v+="_BB";
+    r.names[editLang]=v;
   }else{
     r.m=document.getElementById("f_m").value.trim();
     r.r=document.getElementById("f_r").value.trim();
@@ -234,34 +276,38 @@ function saveModal(){
 }
 
 async function saveAll(){
-  const ko={},en={},gd={};
-  for(const r of rows){
-    if(r.en) en[r.id]=r.en;
-    if(r.ko) ko[r.id]=r.ko;
-    const m=r.m===""?null:Number(r.m);
-    const rr=r.r.includes(",")?r.r.split(",").map(x=>x.trim()).filter(Boolean):(r.r||null);
-    const c=r.c.length?r.c.slice():null;
-    if(m!=null||rr||c){ const o={}; if(m!=null)o.m=m; if(rr)o.r=rr; if(c)o.c=c; gd[r.id]=o; }
-  }
-  const next={en,ko,gd}, b=document.getElementById("saveBtn"), st=document.getElementById("status");
+  const b=document.getElementById("saveBtn"), st=document.getElementById("status");
   b.disabled=true;
   try{
     let n=0;
-    for(const k of ["en","ko","gd"]){
-      if(JSON.stringify(next[k])===JSON.stringify(orig[k])) continue;
-      st.textContent="저장 중: "+FILES[k]+"…";
-      await putFile(k, JSON.stringify(next[k]));
-      orig[k]=JSON.parse(JSON.stringify(next[k])); n++;
+    // 언어별 이름 파일
+    for(const l of LANGS){
+      const next={}; for(const r of rows){ if(r.names[l]) next[r.id]=r.names[l]; }
+      if(JSON.stringify(next)===JSON.stringify(orig[l]||{})) continue;
+      st.textContent="저장 중: "+namesPath(l)+"…";
+      await putFile(namesPath(l), JSON.stringify(next), l);
+      orig[l]=next; n++;
     }
+    // 게임데이터
+    const gd={};
+    for(const r of rows){
+      const m=r.m===""?null:Number(r.m);
+      const rr=r.r.includes(",")?r.r.split(",").map(x=>x.trim()).filter(Boolean):(r.r||null);
+      const c=r.c.length?r.c.slice():null;
+      if(m!=null||rr||c){ const o={}; if(m!=null)o.m=m; if(rr)o.r=rr; if(c)o.c=c; gd[r.id]=o; }
+    }
+    if(JSON.stringify(gd)!==JSON.stringify(orig.gd)){ st.textContent="저장 중: "+GD_FILE+"…"; await putFile(GD_FILE, JSON.stringify(gd), "gd"); orig.gd=gd; n++; }
     buildRows(); renderList();
     st.textContent = n?`✓ 저장됨 (${n}개 파일) — 1~2분 뒤 앱에 반영`:"변경 없음";
   }catch(e){ st.textContent="저장 실패: "+e.message; }
   finally{ b.disabled=false; }
 }
-async function putFile(k,content){
-  const r=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILES[k]}`,{method:"PUT",headers:{Authorization:`Bearer ${token}`,Accept:"application/vnd.github+json","Content-Type":"application/json"},body:JSON.stringify({message:`DB 편집: ${FILES[k]}`,content:b64encode(content),sha:shas[k],branch:BRANCH})});
-  if(!r.ok){ const t=await r.text(); throw new Error(FILES[k]+" "+r.status+" "+t.slice(0,90)); }
-  const j=await r.json(); shas[k]=j.content.sha;
+async function putFile(path, content, shaKey){
+  const body={message:`DB 편집: ${path}`, content:b64encode(content), branch:BRANCH};
+  if(shas[shaKey]) body.sha=shas[shaKey];   // sha 없으면 새 파일 생성(create)
+  const r=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`,{method:"PUT",headers:{Authorization:`Bearer ${token}`,Accept:"application/vnd.github+json","Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){ const t=await r.text(); throw new Error(path+" "+r.status+" "+t.slice(0,90)); }
+  const j=await r.json(); shas[shaKey]=j.content.sha;
 }
 function logout(){ localStorage.removeItem("gh_token"); location.reload(); }
 (function(){ const t=localStorage.getItem("gh_token"); if(t) document.getElementById("tok").value=t; })();
