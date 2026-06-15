@@ -22,6 +22,9 @@
   .tab.on{background:var(--gold);color:#1f1709;border-color:var(--gold)}
   .row2{display:flex;gap:8px;align-items:center}
   .row2 input.search{flex:1;padding:9px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--txt)}
+  .cats{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .cat{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--sub);border-radius:99px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer}
+  .cat.on{background:#F2EFE4;color:#14210f;border-color:#F2EFE4}
   .status{font-size:12px;color:var(--sub);margin-top:6px}
   .list{margin-top:6px}
   .item{display:flex;gap:10px;align-items:center;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer}
@@ -64,6 +67,7 @@
         <button class="btn" id="saveBtn" onclick="saveAll()">저장</button>
         <button class="btn ghost" onclick="logout()">잠금</button>
       </div>
+      <div class="cats" id="cats"></div>
       <div class="status" id="status"></div>
     </div>
     <div class="list" id="list"></div>
@@ -85,7 +89,30 @@
 <script>
 const OWNER="JaehweePark", REPO="CoC_MultiTimer", BRANCH="main";
 const FILES={ en:"names/en.json", ko:"names/ko.json", gd:"gamedata.json" };
-let token="", shas={}, orig={en:{},ko:{},gd:{}}, rows=[], byId={}, curTab="names", editId=null;
+let token="", shas={}, orig={en:{},ko:{},gd:{}}, rows=[], byId={}, curTab="names", curCat="", editId=null;
+
+// 분류: 본마을 건물은 ID 매핑, 나머지는 ID 범위. _BB(한글 끝)는 자동 장인기지.
+const TOWERS=new Set("1000008 1000009 1000013 1000012 1000011 1000028 1000019 1000032 1000021 1000027 1000031 1000067 1000077 1000089 1000010 1000084 1000085 1000079 1000086 1000102".split(" ").map(Number));
+const RESOURCE=new Set("1000004 1000002 1000005 1000003 1000023 1000024".split(" ").map(Number));
+const ARMY=new Set("1000000 1000006 1000026 1000007 1000020 1000029 1000071 1000070 1000059 1000068 1000014".split(" ").map(Number));
+const CATS=["방어타워","자원","군대","함정","유닛","마법","영웅","펫","가디언","장인기지","기타건물"];
+const BB_IDS=new Set("1000033 1000034 1000035 1000036 1000037 1000038 1000039 1000040 1000041 1000042 1000043 1000044 1000045 1000046 1000048 1000049 1000050 1000051 1000052 1000053 1000054 1000055 1000056 1000057 1000058 1000063 1000065 1000078 1000080 1000081 1000082 12000010 12000011 12000013 12000014 4000031 4000032 4000033 4000034 4000035 4000036 4000037 4000038 4000041 4000042 4000070 28000003 28000005".split(" ").map(Number));
+function displayKo(r){ return BB_IDS.has(+r.id) ? String(r.ko).replace(/_BB$/,"") : r.ko; }
+function category(r){
+  if(BB_IDS.has(+r.id)) return "장인기지";
+  const id=+r.id;
+  if(id>=107000000) return "가디언";
+  if(id>=73000000) return "펫";
+  if(id>=28000000) return "영웅";
+  if(id>=26000000) return "마법";
+  if(id>=12000000) return "함정";
+  if(id>=4000000) return "유닛";
+  if(TOWERS.has(id)) return "방어타워";
+  if(RESOURCE.has(id)) return "자원";
+  if(ARMY.has(id)) return "군대";
+  if(id>=1000000) return "기타건물";
+  return "기타";
+}
 
 function b64encode(s){ return btoa(unescape(encodeURIComponent(s))); }
 function b64decode(s){ return decodeURIComponent(escape(atob(s.replace(/\s/g,"")))); }
@@ -101,7 +128,7 @@ async function enter(){
       if(!r.ok) throw new Error(p+" "+r.status);
       const j=await r.json(); shas[k]=j.sha; orig[k]=JSON.parse(b64decode(j.content));
     }
-    buildRows();
+    buildRows(); renderCats();
     document.getElementById("gate").style.display="none";
     document.getElementById("app").style.display="block";
     renderList();
@@ -115,6 +142,12 @@ function buildRows(){
   byId={}; rows.forEach(r=>byId[r.id]=r);
 }
 
+function renderCats(){
+  const c=document.getElementById("cats");
+  const mk=(v,lbl)=>`<button class="cat${curCat===v?' on':''}" onclick="setCat('${v}')">${lbl}</button>`;
+  c.innerHTML=mk("","전체")+CATS.map(x=>mk(x,x)).join("");
+}
+function setCat(c){ curCat=c; renderCats(); renderList(); }
 function switchTab(t){ curTab=t; document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t)); renderList(); }
 
 function dirtyOf(r){
@@ -129,12 +162,13 @@ function renderList(){
   const frag=document.createDocumentFragment(); let shown=0,dirty=0;
   rows.forEach(r=>{
     const d=dirtyOf(r); if(d) dirty++;
+    if(curCat && category(r)!==curCat) return;
     if(q && !(r.ko.toLowerCase().includes(q)||r.en.toLowerCase().includes(q)||r.id.includes(q))) return;
     shown++;
     const el=document.createElement("div");
-    el.className="item"+(r.ko.endsWith("_BB")?" bb":"")+(d?" dirty":"");
-    const meta = curTab==="names" ? "" : (r.m!==""||r.c.length?`max ${esc(r.m)} · ${esc(r.r)} · 비용 ${r.c.length}`:"—");
-    el.innerHTML=`<span class="id">${r.id}</span><span class="nm">${esc(r.ko||r.en)||"(이름없음)"}${r.ko&&r.en?`<small>${esc(r.en)}</small>`:""}</span><span class="meta">${meta}</span>`;
+    el.className="item"+(BB_IDS.has(+r.id)?" bb":"")+(d?" dirty":"");
+    const meta = curTab==="names" ? category(r) : (r.m!==""||r.c.length?`max ${esc(r.m)} · ${esc(r.r)} · 비용 ${r.c.length}`:"—");
+    el.innerHTML=`<span class="id">${r.id}</span><span class="nm">${esc(displayKo(r)||r.en)||"(이름없음)"}${r.ko&&r.en?`<small>${esc(r.en)}</small>`:""}</span><span class="meta">${meta}</span>`;
     el.onclick=()=>openModal(r.id);
     frag.appendChild(el);
   });
@@ -145,12 +179,13 @@ function renderList(){
 function openModal(id){
   editId=id; const r=byId[id];
   document.getElementById("mTitle").textContent=(r.ko||r.en||"(이름없음)");
-  document.getElementById("mId").textContent="ID "+id;
+  document.getElementById("mId").textContent="ID "+id+" · "+category(r);
   const body=document.getElementById("mBody");
   if(curTab==="names"){
+    const bb=BB_IDS.has(+id);
     body.innerHTML=
       `<div class="fld"><label>영문 (en)</label><input id="f_en" value="${esc(r.en)}"></div>`+
-      `<div class="fld"><label>한글 (ko) — 장인기지는 끝에 _BB</label><input id="f_ko" value="${esc(r.ko)}"></div>`;
+      `<div class="fld"><label>한글 (ko)${bb?' — 장인기지: 저장 시 _BB 자동':''}</label><input id="f_ko" value="${esc(displayKo(r))}"></div>`;
   }else{
     const cg=r.c.map((v,i)=>`<div class="c"><b>Lv${i+1}</b><input data-ci="${i}" value="${esc(v)}" inputmode="numeric"></div>`).join("");
     body.innerHTML=
@@ -168,7 +203,9 @@ function saveModal(){
   const r=byId[editId];
   if(curTab==="names"){
     r.en=document.getElementById("f_en").value.trim();
-    r.ko=document.getElementById("f_ko").value.trim();
+    let ko=document.getElementById("f_ko").value.trim();
+    if(BB_IDS.has(+editId) && ko && !ko.endsWith("_BB")) ko+="_BB";
+    r.ko=ko;
   }else{
     r.m=document.getElementById("f_m").value.trim();
     r.r=document.getElementById("f_r").value.trim();
