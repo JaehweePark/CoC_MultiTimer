@@ -1660,7 +1660,7 @@ function CocMultiTimer() {
           color: #F2EFE4; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; padding-bottom: 86px; }
         .cmt-header { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(10px);
           background: rgba(15,26,18,0.88); border-bottom: 1px solid rgba(255,255,255,0.07);
-          display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; }
+          display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px; }
         .cmt-htitle { font-size: 18px; font-weight: 900; letter-spacing: -0.02em; }
         .cmt-htitle em { color: #F5B82E; font-style: normal; }
         .cmt-wrap { max-width: 680px; margin: 0 auto; padding: 16px; }
