@@ -26,6 +26,20 @@
   var SCOPE = "https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email";
   var FILE = "coctimer-sync.json";
   var token = null, email = null, client = null;
+  var TOK_KEY = "cctimer_drive_tok";
+  // accessToken을 만료시각과 함께 캐시 → 새로고침/백업/복원 시 1시간 내 재사용(로그인 팝업 0)
+  function saveTok(resp) {
+    token = resp.access_token;
+    var ttl = ((resp.expires_in || 3600) - 120) * 1000; // 만료 2분 전까지 유효 취급
+    try { localStorage.setItem(TOK_KEY, JSON.stringify({ t: token, e: Date.now() + ttl })); } catch (e) {}
+  }
+  function loadTok() {
+    try {
+      var s = JSON.parse(localStorage.getItem(TOK_KEY) || "null");
+      if (s && s.t && s.e > Date.now()) { token = s.t; return true; }
+    } catch (e) {}
+    return false;
+  }
 
   function ensureClient() {
     if (client) return true;
@@ -38,7 +52,7 @@
     return new Promise(function (resolve, reject) {
       if (!ensureClient()) return reject(new Error("gis-not-loaded"));
       client.callback = function (resp) {
-        if (resp && resp.access_token) { token = resp.access_token; resolve(token); }
+        if (resp && resp.access_token) { saveTok(resp); resolve(token); }
         else reject(new Error((resp && resp.error) || "no-token"));
       };
       client.error_callback = function (err) { reject(new Error((err && err.type) || "gis-error")); };
@@ -55,13 +69,15 @@
   async function signOut() {
     try { if (token && google.accounts.oauth2.revoke) google.accounts.oauth2.revoke(token, function () {}); } catch (e) {}
     token = null; email = null;
+    try { localStorage.removeItem(TOK_KEY); } catch (e) {}
   }
-  async function status() { return { signedIn: !!token, email: email }; }
+  async function status() { if (!token) loadTok(); return { signedIn: !!token, email: email }; }
   async function resume(savedEmail) {
+    if (loadTok()) { if (savedEmail) email = savedEmail; return true; } // 캐시 유효하면 팝업 없이 복원
     try { await getToken(""); if (savedEmail) email = savedEmail; if (!email) await fetchEmail(); return !!token; }
     catch (e) { return false; }
   }
-  async function ensureToken() { if (!token) await getToken(""); }
+  async function ensureToken() { if (token) return; if (loadTok()) return; await getToken(""); }
   async function findId() {
     var q = encodeURIComponent("name='" + FILE + "'");
     var r = await fetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q=" + q,
@@ -1657,7 +1673,7 @@ function CocMultiTimer() {
   }
   return /* @__PURE__ */ React.createElement("div", { ref: rootRef, className: "cmt-root" + (theme === "light" ? " light" : "") + (showAds ? " has-banner" : "") + (showAds && isNative ? " ads-native" : ""), dir, style: { zoom: fontScale } }, /* @__PURE__ */ React.createElement("style", null, `
         .cmt-root { min-height: 100vh; background: radial-gradient(1200px 500px at 50% -10%, rgba(245,184,46,0.07), transparent 60%), #0F1A12;
-          color: #F2EFE4; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; padding-bottom: 86px; }
+          color: #F2EFE4; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
         .cmt-header { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(10px);
           background: rgba(15,26,18,0.88); border-bottom: 1px solid rgba(255,255,255,0.07);
           display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px; }
@@ -1776,7 +1792,7 @@ function CocMultiTimer() {
           background: rgba(20,33,22,0.96); border-top: 1px solid rgba(255,255,255,0.08); color: #5E6E5B;
           font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
         .cmt-banner .tag { border: 1px solid rgba(255,255,255,0.16); border-radius: 6px; padding: 2px 7px; font-size: 9.5px; }
-        .cmt-root.has-banner { padding-bottom: 150px; }
+        .cmt-root.has-banner { padding-bottom: calc(160px + env(safe-area-inset-bottom)); }
         .cmt-root.ads-native .cmt-tabbar { bottom: 60px; }
         .cmt-btn.donate { width: 100%; background: rgba(245,184,46,0.12); color: #F5B82E; border: 1px solid rgba(245,184,46,0.4); }
         .cmt-donate-card { background: linear-gradient(180deg, rgba(245,184,46,0.13), rgba(245,184,46,0.04)); border: 1px solid rgba(245,184,46,0.35);
