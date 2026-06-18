@@ -65,6 +65,7 @@
       <div class="tabs">
         <button class="tab on" data-t="names" onclick="switchTab('names')">이름 수정</button>
         <button class="tab" data-t="gd" onclick="switchTab('gd')">게임데이터 수정</button>
+        <button class="tab" data-t="promo" onclick="switchTab('promo')">프로모션</button>
       </div>
       <div class="row2">
         <select id="langsel" class="lang" onchange="setLang(this.value)"></select>
@@ -77,6 +78,7 @@
           <option value="dirty">변경먼저</option>
           <option value="missing">번역없음먼저</option>
         </select>
+        <button class="btn" id="addPromoBtn" style="display:none" onclick="openPromoNew()">+ 코드 추가</button>
         <button class="btn" id="saveBtn" onclick="saveAll()">저장</button>
         <button class="btn ghost" onclick="logout()">잠금</button>
       </div>
@@ -107,8 +109,13 @@ const BASE="en";
 const LANG_LABEL={ko:"한국어",en:"English",zh:"中文",ja:"日本語",de:"Deutsch",fr:"Français",es:"Español",it:"Italiano",ru:"Русский",pt:"Português",tr:"Türkçe",ar:"العربية",th:"ไทย",vi:"Tiếng Việt",id:"Indonesia",nl:"Nederlands",no:"Norsk",fi:"Suomi"};
 const GD_FILE="gamedata.json";
 const namesPath=(l)=>"names/"+l+".json";
+const PROMO_FILE="promo-codes.json";
+const PROMO_SCHEMA={version:1,comment:"CCTimer promo codes. SHA-256 hashed; plaintext never stored.",match:"codeHash = SHA-256 hex of trim+UPPERCASE(code)"};
+const UNLOCKS=["all","ad_free","sync","pro"], PLATFORMS=["all","android","ios"];
 
-let token="", shas={}, orig={gd:{}}, rows=[], byId={}, curTab="names", curCat="", curSort="id", editLang="ko", editId=null;
+let token="", shas={}, orig={gd:{}}, rows=[], byId={}, curTab="names", curCat="", curSort="id", editLang="ko", editId=null, promoRows=[], promoEditIdx=-1;
+
+async function sha256Hex(s){ const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
 
 const BB_IDS=new Set("1000033 1000034 1000035 1000036 1000037 1000038 1000039 1000040 1000041 1000042 1000043 1000044 1000045 1000046 1000048 1000049 1000050 1000051 1000052 1000053 1000054 1000055 1000056 1000057 1000058 1000063 1000065 1000078 1000080 1000081 1000082 12000010 12000011 12000013 12000014 4000031 4000032 4000033 4000034 4000035 4000036 4000037 4000038 4000041 4000042 4000070 28000003 28000005".split(" ").map(Number));
 const TOWERS=new Set("1000008 1000009 1000013 1000012 1000011 1000028 1000019 1000032 1000021 1000027 1000031 1000067 1000077 1000089 1000010 1000084 1000085 1000079 1000086 1000102".split(" ").map(Number));
@@ -152,6 +159,8 @@ async function enter(){
   try{
     const g=await ghGet(GD_FILE); orig.gd=g.data; shas.gd=g.sha;
     for(const l of LANGS){ const r=await ghGet(namesPath(l)); orig[l]=r.data; shas[l]=r.sha; }
+    const pr=await ghGet(PROMO_FILE); orig.promo=(pr.data&&Array.isArray(pr.data.codes))?pr.data:{_schema:PROMO_SCHEMA,codes:[]}; shas.promo=pr.sha;
+    promoRows=(orig.promo.codes||[]).map(c=>({...c}));
     buildRows(); renderLangSel(); renderCats();
     document.getElementById("gate").style.display="none";
     document.getElementById("app").style.display="block";
@@ -184,7 +193,15 @@ function renderCats(){
 function setCat(c){ curCat=c; renderCats(); renderList(); }
 function setSort(v){ curSort=v; renderList(); }
 function setLang(v){ editLang=v; renderList(); }
-function switchTab(t){ curTab=t; document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t)); renderLangSel(); renderList(); }
+function switchTab(t){
+  curTab=t; document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  const promo=t==="promo";
+  document.getElementById("addPromoBtn").style.display=promo?"":"none";
+  document.getElementById("cats").style.display=promo?"none":"";
+  document.getElementById("sort").style.display=promo?"none":"";
+  document.getElementById("q").placeholder=promo?"검색 (라벨·unlock·해시)":"검색 (이름·ID)";
+  renderLangSel(); renderList();
+}
 
 function gdDirty(r){
   const og=orig.gd[r.id]||{}, or=Array.isArray(og.r)?og.r.join(","):(og.r||"");
@@ -208,6 +225,7 @@ function sortedRows(){
 
 function renderList(){
   const q=document.getElementById("q").value.trim().toLowerCase();
+  if(curTab==="promo") return renderPromoList(q);
   const L=document.getElementById("list"); L.innerHTML="";
   const frag=document.createDocumentFragment(); let shown=0,dirty=0;
   sortedRows().forEach(r=>{
@@ -236,6 +254,61 @@ function renderList(){
   document.getElementById("status").textContent=`${shown}개 표시 · 변경 ${dirty}개`+(dirty?" (저장 누르면 반영)":"")+(curTab==="names"?` · 편집언어: ${LANG_LABEL[editLang]||editLang}`:"");
 }
 
+// ── 프로모션 코드 탭 ──
+function promoDirty(){ const o={_schema:(orig.promo&&orig.promo._schema)||PROMO_SCHEMA,codes:promoRows}; return JSON.stringify(o)!==JSON.stringify(orig.promo||{}); }
+function renderPromoList(q){
+  const L=document.getElementById("list"); L.innerHTML="";
+  const frag=document.createDocumentFragment(); let shown=0;
+  promoRows.forEach((c,idx)=>{
+    const hay=((c.label||"")+" "+(c.unlock||"")+" "+(c.codeHash||"")).toLowerCase();
+    if(q && !hay.includes(q)) return;
+    shown++;
+    const el=document.createElement("div"); el.className="item";
+    const off=c.enabled===false?'<span class="miss">OFF</span> ':"";
+    const dates=(c.startDate||"?")+" ~ "+(c.endDate||"무기한");
+    el.innerHTML=`<span class="id">${esc((c.codeHash||"").slice(0,8))}</span><span class="nm">${off}${esc(c.label||"(라벨 없음)")} <small>${esc(c.unlock||"")}</small></span><span class="meta">${esc(dates)} · ${esc(c.platform||"all")}</span>`;
+    el.onclick=()=>openPromoEdit(idx);
+    frag.appendChild(el);
+  });
+  L.appendChild(frag);
+  document.getElementById("status").textContent=`코드 ${promoRows.length}개 · 표시 ${shown}`+(promoDirty()?" · 변경됨(저장 누르면 반영)":"");
+}
+function openPromoNew(){ promoEditIdx=-1; renderPromoModal({unlock:"all",startDate:new Date().toISOString().slice(0,10),endDate:"",enabled:true,platform:"all",label:""}, true); }
+function openPromoEdit(idx){ promoEditIdx=idx; renderPromoModal(promoRows[idx], false); }
+function renderPromoModal(c, isNew){
+  document.getElementById("mTitle").textContent=isNew?"새 프로모션 코드":"코드 편집";
+  document.getElementById("mId").textContent=isNew?"평문 입력 → 저장 시 SHA-256 해시 (평문은 저장 안 됨)":("hash "+(c.codeHash||"").slice(0,16)+"…");
+  const sel=(id,opts,val)=>`<select id="${id}" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:7px;color:var(--txt)">`+opts.map(o=>`<option value="${o}"${o===val?" selected":""}>${o}</option>`).join("")+`</select>`;
+  let html="";
+  if(isNew) html+=`<div class="fld"><label>코드 평문 (대소문자 무관 · 저장 후 복구 불가)</label><input id="p_plain" placeholder="예: CCTIMER-PRO2026" autofocus></div>`;
+  html+=`<div class="fld"><label>unlock (ad_free=광고제거 · sync=동기화 · pro/all=둘다)</label>${sel("p_unlock",UNLOCKS,c.unlock||"all")}</div>`;
+  html+=`<div class="fld" style="display:flex;gap:8px"><div style="flex:1"><label>시작일 YYYY-MM-DD</label><input id="p_start" value="${esc(c.startDate||"")}"></div><div style="flex:1"><label>종료일 (비우면 무기한)</label><input id="p_end" value="${esc(c.endDate||"")}"></div></div>`;
+  html+=`<div class="fld"><label>platform</label>${sel("p_platform",PLATFORMS,c.platform||"all")}</div>`;
+  html+=`<div class="fld"><label>라벨 (운영용 메모)</label><input id="p_label" value="${esc(c.label||"")}"></div>`;
+  html+=`<div class="fld"><label><input type="checkbox" id="p_enabled"${c.enabled!==false?" checked":""}> 활성(enabled)</label></div>`;
+  if(!isNew) html+=`<div style="margin-top:4px"><button class="btn ghost" style="color:#E08B8B;border-color:#E08B8B" onclick="deletePromo()">이 코드 삭제</button></div>`;
+  document.getElementById("mBody").innerHTML=html;
+  document.getElementById("modalOv").style.display="flex";
+}
+async function savePromoModal(){
+  const g=(id)=>document.getElementById(id);
+  const entry={ unlock:g("p_unlock").value, startDate:g("p_start").value.trim()||null, endDate:g("p_end").value.trim()||null, enabled:g("p_enabled").checked, platform:g("p_platform").value, label:g("p_label").value.trim(), maxUses:null };
+  if(promoEditIdx<0){
+    const plain=g("p_plain").value.trim().toUpperCase();
+    if(!plain){ alert("평문 코드를 입력하세요"); return; }
+    entry.codeHash=await sha256Hex(plain);
+    if(promoRows.some(c=>c.codeHash===entry.codeHash)){ alert("이미 등록된 코드입니다"); return; }
+    entry.createdAt=new Date().toISOString();
+    promoRows.push(entry);
+  }else{
+    const cur=promoRows[promoEditIdx];
+    entry.codeHash=cur.codeHash; entry.createdAt=cur.createdAt||new Date().toISOString();
+    promoRows[promoEditIdx]=entry;
+  }
+  closeModal(); renderList();
+}
+function deletePromo(){ if(promoEditIdx>=0 && confirm("이 코드를 삭제할까요?")){ promoRows.splice(promoEditIdx,1); closeModal(); renderList(); } }
+
 function openModal(id){
   editId=id; const r=byId[id];
   document.getElementById("mTitle").textContent=(disp(r,editLang)||r.names[BASE]||"(이름없음)");
@@ -260,7 +333,8 @@ function openModal(id){
   document.getElementById("modalOv").style.display="flex";
 }
 function closeModal(){ document.getElementById("modalOv").style.display="none"; editId=null; }
-function saveModal(){
+async function saveModal(){
+  if(curTab==="promo") return savePromoModal();
   const r=byId[editId];
   if(curTab==="names"){
     if(editLang!==BASE){ const fb=document.getElementById("f_base"); if(fb) r.names[BASE]=fb.value.trim(); }
@@ -297,6 +371,9 @@ async function saveAll(){
       if(m!=null||rr||c){ const o={}; if(m!=null)o.m=m; if(rr)o.r=rr; if(c)o.c=c; gd[r.id]=o; }
     }
     if(JSON.stringify(gd)!==JSON.stringify(orig.gd)){ st.textContent="저장 중: "+GD_FILE+"…"; await putFile(GD_FILE, JSON.stringify(gd), "gd"); orig.gd=gd; n++; }
+    // 프로모션 코드
+    const promoObj={_schema:(orig.promo&&orig.promo._schema)||PROMO_SCHEMA, codes:promoRows};
+    if(JSON.stringify(promoObj)!==JSON.stringify(orig.promo||{})){ st.textContent="저장 중: "+PROMO_FILE+"…"; await putFile(PROMO_FILE, JSON.stringify(promoObj,null,2), "promo"); orig.promo=promoObj; n++; }
     buildRows(); renderList();
     st.textContent = n?`✓ 저장됨 (${n}개 파일) — 1~2분 뒤 앱에 반영`:"변경 없음";
   }catch(e){ st.textContent="저장 실패: "+e.message; }

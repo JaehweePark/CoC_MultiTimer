@@ -573,6 +573,8 @@ const PUBLIC_NAMES_KEY = "coc-multi-timer-public-names";
 const PUBLIC_NAMES_BASE = "https://jaehweepark.github.io/CoC_MultiTimer/names";
 const PUBLIC_GAMEDATA_KEY = "coc-multi-timer-public-gamedata";
 const PUBLIC_GAMEDATA_URL = "https://jaehweepark.github.io/CoC_MultiTimer/gamedata.json";
+const PUBLIC_PROMO_URL = "https://jaehweepark.github.io/CoC_MultiTimer/promo-codes.json";
+const PROMO_CACHE_KEY = "coc-multi-timer-promo-db";
 const SUGGEST_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSdroVyqUYGL6XMWWssRPswZUplxXhB_tEznhVQZzLo00tEJOQ/viewform";
 const SUGGEST_ENTRY = { id: "entry.158863278", name: "entry.286539750", lang: "entry.1931750880" };
 const ALERT_LEADS = [0, 0.5, 1, 5, 10, 30];
@@ -606,6 +608,20 @@ function mergeAccounts(localArr, remoteArr) {
 }
 function promoActive(p, nowMs) {
   return !!p && (p.days === 0 || nowMs < p.at + p.days * 864e5);
+}
+async function sha256Hex(s) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function promoEntryValid(e, isPwa) {
+  if (!e || e.enabled === false) return false;
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (e.startDate && today < e.startDate) return false;
+  if (e.endDate && today > e.endDate) return false;
+  const p = e.platform || "all";
+  if (p === "android") return !isPwa;
+  if (p === "ios" || p === "web") return isPwa;
+  return true;
 }
 const DONATE_URL = "https://ko-fi.com/ondol";
 const PAYPAL_URL = "";
@@ -668,6 +684,7 @@ function CocMultiTimer() {
   const [renameVal, setRenameVal] = useState("");
   const [confirmDel, setConfirmDel] = useState(null);
   const [promo, setPromo] = useState(null);
+  const [promoDb, setPromoDb] = useState([]);
   const [keepAwake, setKeepAwake] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [toast, setToast] = useState(null);
@@ -933,6 +950,34 @@ function CocMultiTimer() {
       cancelled = true;
     };
   }, [loaded]);
+  useEffect(() => {
+    if (!loaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const c = await storage.get(PROMO_CACHE_KEY);
+        if (!cancelled && c?.value) {
+          const a = JSON.parse(c.value);
+          if (Array.isArray(a)) setPromoDb(a);
+        }
+      } catch (e) {
+      }
+      try {
+        const res = await fetch(PUBLIC_PROMO_URL, { cache: "no-cache" });
+        if (!res.ok) return;
+        const j = await res.json();
+        const codes = j && Array.isArray(j.codes) ? j.codes : null;
+        if (cancelled || !codes) return;
+        setPromoDb(codes);
+        storage.set(PROMO_CACHE_KEY, JSON.stringify(codes)).catch(() => {
+        });
+      } catch (e) {
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded]);
   async function changeLang(v) {
     setLangPref(v || null);
     try {
@@ -953,8 +998,38 @@ function CocMultiTimer() {
     if (toastRef.current) clearTimeout(toastRef.current);
     toastRef.current = setTimeout(() => setToast(null), 2500);
   }
-  function applyCode() {
+  function grantUnlock(unlock, code) {
+    const u = unlock || "ad_free";
+    let synced = false;
+    if (u === "ad_free" || u === "pro" || u === "all") {
+      const p = { code, at: Date.now(), days: 0 };
+      setPromo(p);
+      storage.set(ADFREE_KEY, JSON.stringify(p)).catch(() => {
+      });
+    }
+    if (u === "sync" || u === "pro" || u === "all") {
+      setBackupEnabled(true);
+      storage.set(BACKUP_KEY, "1").catch(() => {
+      });
+      synced = true;
+    }
+    setCodeInput("");
+    showToast(synced ? t("backupOn") : t("adRemoved"));
+  }
+  async function applyCode() {
     const code = codeInput.trim().toUpperCase();
+    if (!code) return;
+    try {
+      const isPwa = typeof window !== "undefined" && !!window.__PWA__;
+      const hash = await sha256Hex(code);
+      const e = (promoDb || []).find((c) => c && c.codeHash === hash);
+      if (e) {
+        if (promoEntryValid(e, isPwa)) grantUnlock(e.unlock, code);
+        else showToast(t("adWrong"));
+        return;
+      }
+    } catch (e) {
+    }
     if (code === BACKUP_CODE) {
       setBackupEnabled(true);
       setCodeInput("");
@@ -1136,7 +1211,7 @@ function CocMultiTimer() {
     } catch (e) {
     }
     try {
-      for (const k of [STORAGE_KEY, LANG_KEY, ADFREE_KEY, KEEPAWAKE_KEY, ALERTS_KEY, FILTER_CAT_KEY, FILTER_ACC_KEY, FONT_SCALE_KEY, NAME_OVERRIDE_KEY, THEME_KEY, ONBOARDED_KEY, PUBLIC_NAMES_KEY, PUBLIC_GAMEDATA_KEY, ALERT_CAT_KEY, ALERT_ACC_KEY, BACKUP_KEY, AUTOSYNC_KEY, DRIVE_EMAIL_KEY]) await storage.delete(k);
+      for (const k of [STORAGE_KEY, LANG_KEY, ADFREE_KEY, KEEPAWAKE_KEY, ALERTS_KEY, FILTER_CAT_KEY, FILTER_ACC_KEY, FONT_SCALE_KEY, NAME_OVERRIDE_KEY, THEME_KEY, ONBOARDED_KEY, PUBLIC_NAMES_KEY, PUBLIC_GAMEDATA_KEY, PROMO_CACHE_KEY, ALERT_CAT_KEY, ALERT_ACC_KEY, BACKUP_KEY, AUTOSYNC_KEY, DRIVE_EMAIL_KEY]) await storage.delete(k);
     } catch (e) {
     }
     try {
