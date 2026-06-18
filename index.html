@@ -576,8 +576,7 @@ const PUBLIC_GAMEDATA_URL = "https://jaehweepark.github.io/CoC_MultiTimer/gameda
 const PUBLIC_PROMO_URL = "https://jaehweepark.github.io/CoC_MultiTimer/promo-codes.json";
 const PROMO_CACHE_KEY = "coc-multi-timer-promo-db";
 const PROMO_USES_KEY = "coc-multi-timer-promo-uses";
-const SUGGEST_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSdroVyqUYGL6XMWWssRPswZUplxXhB_tEznhVQZzLo00tEJOQ/viewform";
-const SUGGEST_ENTRY = { id: "entry.158863278", name: "entry.286539750", lang: "entry.1931750880" };
+const SUGGEST_POST_URL = "";
 const ALERT_LEADS = [0, 0.5, 1, 5, 10, 30];
 const ALERT_CAT_KEY = "coc-multi-timer-alert-cat";
 const ALERT_ACC_KEY = "coc-multi-timer-alert-acc";
@@ -1388,14 +1387,9 @@ function CocMultiTimer() {
   const rawName = (id) => (nameOverride[lang] && nameOverride[lang][id] || publicNames[lang] && publicNames[lang][id] || baseName(id, lang)).replace(/_BB$/, "");
   const itemName = (id) => BB_IDS.has(id) ? rawName(id) + "_BB" : rawName(id);
   function submitSuggest(id, name) {
-    if (!SUGGEST_FORM || !name) return;
+    if (!SUGGEST_POST_URL || !name) return;
     try {
-      const url = SUGGEST_FORM.replace("/viewform", "/formResponse");
-      const body = new URLSearchParams();
-      body.set(SUGGEST_ENTRY.id, String(id));
-      body.set(SUGGEST_ENTRY.name, name);
-      body.set(SUGGEST_ENTRY.lang, lang);
-      fetch(url, { method: "POST", mode: "no-cors", body }).catch(() => {
+      fetch(SUGGEST_POST_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ id: String(id), name, lang }) }).catch(() => {
       });
     } catch (e) {
     }
