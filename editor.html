@@ -265,8 +265,8 @@ function renderPromoList(q){
     shown++;
     const el=document.createElement("div"); el.className="item";
     const off=c.enabled===false?'<span class="miss">OFF</span> ':"";
-    const dates=(c.startDate||"?")+" ~ "+(c.endDate||"무기한");
-    el.innerHTML=`<span class="id">${esc((c.codeHash||"").slice(0,8))}</span><span class="nm">${off}${esc(c.label||"(라벨 없음)")} <small>${esc(c.unlock||"")}</small></span><span class="meta">${esc(dates)} · ${esc(c.platform||"all")}</span>`;
+    const ex=c.expiry||{}; const exTxt = ex.mode==="date" ? ("~"+(ex.date||"?")) : ({0:"무기한",7:"1주일",30:"1개월",180:"6개월",365:"1년"}[ex.days]||((ex.days||0)+"일"));
+    el.innerHTML=`<span class="id">${esc((c.codeHash||"").slice(0,8))}</span><span class="nm">${off}${esc(c.label||"(라벨 없음)")} <small>${esc(c.unlock||"")}</small></span><span class="meta">${esc(exTxt)} · ${esc(c.platform||"all")}</span>`;
     el.onclick=()=>openPromoEdit(idx);
     frag.appendChild(el);
   });
@@ -282,7 +282,13 @@ function renderPromoModal(c, isNew){
   let html="";
   if(isNew) html+=`<div class="fld"><label>코드 평문 (대소문자 무관 · 저장 후 복구 불가)</label><input id="p_plain" placeholder="예: CCTIMER-PRO2026" autofocus></div>`;
   html+=`<div class="fld"><label>unlock (ad_free=광고제거 · sync=동기화 · pro/all=둘다)</label>${sel("p_unlock",UNLOCKS,c.unlock||"all")}</div>`;
-  html+=`<div class="fld" style="display:flex;gap:8px"><div style="flex:1"><label>시작일 YYYY-MM-DD</label><input id="p_start" value="${esc(c.startDate||"")}"></div><div style="flex:1"><label>종료일 (비우면 무기한)</label><input id="p_end" value="${esc(c.endDate||"")}"></div></div>`;
+  const ex0=c.expiry||{mode:"duration",days:0};
+  const durs=[[7,"1주일"],[30,"1개월"],[180,"6개월"],[365,"1년"],[0,"무기한"]];
+  const inp="width:100%;margin-top:6px;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:7px;color:var(--txt)";
+  html+=`<div class="fld"><label>혜택 기간 (코드 입력 후부터)</label>`+
+    `<select id="p_exmode" onchange="pExMode(this.value)" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:7px;color:var(--txt)"><option value="duration"${ex0.mode!=='date'?' selected':''}>기간 선택</option><option value="date"${ex0.mode==='date'?' selected':''}>날짜 지정 (고정 만료일)</option></select>`+
+    `<select id="p_exdur" style="${inp};${ex0.mode==='date'?'display:none':''}">${durs.map(([v,l])=>`<option value="${v}"${Number(ex0.days||0)===v?' selected':''}>${l}</option>`).join('')}</select>`+
+    `<input id="p_exdate" type="date" value="${esc(ex0.date||'')}" style="${inp};${ex0.mode==='date'?'':'display:none'}"></div>`;
   html+=`<div class="fld"><label>platform</label>${sel("p_platform",PLATFORMS,c.platform||"all")}</div>`;
   html+=`<div class="fld"><label>라벨 (운영용 메모)</label><input id="p_label" value="${esc(c.label||"")}"></div>`;
   html+=`<div class="fld"><label><input type="checkbox" id="p_enabled"${c.enabled!==false?" checked":""}> 활성(enabled)</label></div>`;
@@ -290,9 +296,12 @@ function renderPromoModal(c, isNew){
   document.getElementById("mBody").innerHTML=html;
   document.getElementById("modalOv").style.display="flex";
 }
+function pExMode(v){ document.getElementById("p_exdur").style.display=v==="duration"?"":"none"; document.getElementById("p_exdate").style.display=v==="date"?"":"none"; }
 async function savePromoModal(){
   const g=(id)=>document.getElementById(id);
-  const entry={ unlock:g("p_unlock").value, startDate:g("p_start").value.trim()||null, endDate:g("p_end").value.trim()||null, enabled:g("p_enabled").checked, platform:g("p_platform").value, label:g("p_label").value.trim(), maxUses:null };
+  const exmode=g("p_exmode").value;
+  const expiry = exmode==="date" ? {mode:"date", date:g("p_exdate").value||null} : {mode:"duration", days:Number(g("p_exdur").value)||0};
+  const entry={ unlock:g("p_unlock").value, expiry, enabled:g("p_enabled").checked, platform:g("p_platform").value, label:g("p_label").value.trim(), maxUses:null };
   if(promoEditIdx<0){
     const plain=g("p_plain").value.trim().toUpperCase();
     if(!plain){ alert("평문 코드를 입력하세요"); return; }

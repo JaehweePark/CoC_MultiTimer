@@ -607,7 +607,12 @@ function mergeAccounts(localArr, remoteArr) {
   return [...map.values()];
 }
 function promoActive(p, nowMs) {
-  return !!p && (p.days === 0 || nowMs < p.at + p.days * 864e5);
+  return !!p && (p.until ? nowMs < p.until : p.days === 0 || nowMs < p.at + p.days * 864e5);
+}
+function computeExp(ex) {
+  if (ex && ex.mode === "date" && ex.date) return { until: Date.parse(ex.date + "T23:59:59") };
+  if (ex && ex.days) return { days: ex.days };
+  return { forever: true };
 }
 async function sha256Hex(s) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -615,12 +620,11 @@ async function sha256Hex(s) {
 }
 function promoEntryValid(e, isPwa) {
   if (!e || e.enabled === false) return false;
-  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  if (e.startDate && today < e.startDate) return false;
-  if (e.endDate && today > e.endDate) return false;
   const p = e.platform || "all";
-  if (p === "android") return !isPwa;
-  if (p === "ios" || p === "web") return isPwa;
+  if (p === "android" && isPwa) return false;
+  if ((p === "ios" || p === "web") && !isPwa) return false;
+  const ex = e.expiry;
+  if (ex && ex.mode === "date" && ex.date && (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) > ex.date) return false;
   return true;
 }
 const DONATE_URL = "https://ko-fi.com/ondol";
@@ -834,7 +838,8 @@ function CocMultiTimer() {
       }
       try {
         const bk = await storage.get(BACKUP_KEY);
-        if (bk?.value === "1") setBackupEnabled(true);
+        const v = bk?.value;
+        if (v && (v === "1" || v === "0" || Number(v) > Date.now())) setBackupEnabled(true);
       } catch (e) {
       }
       try {
@@ -998,18 +1003,21 @@ function CocMultiTimer() {
     if (toastRef.current) clearTimeout(toastRef.current);
     toastRef.current = setTimeout(() => setToast(null), 2500);
   }
-  function grantUnlock(unlock, code) {
+  function grantUnlock(unlock, exp, code) {
     const u = unlock || "ad_free";
+    const now2 = Date.now();
+    const promoExp = exp && exp.until ? { until: exp.until } : { days: exp && exp.days || 0 };
+    const backupVal = exp && exp.until ? String(exp.until) : exp && exp.days ? String(now2 + exp.days * 864e5) : "0";
     let synced = false;
     if (u === "ad_free" || u === "pro" || u === "all") {
-      const p = { code, at: Date.now(), days: 0 };
+      const p = { code, at: now2, ...promoExp };
       setPromo(p);
       storage.set(ADFREE_KEY, JSON.stringify(p)).catch(() => {
       });
     }
     if (u === "sync" || u === "pro" || u === "all") {
       setBackupEnabled(true);
-      storage.set(BACKUP_KEY, "1").catch(() => {
+      storage.set(BACKUP_KEY, backupVal).catch(() => {
       });
       synced = true;
     }
@@ -1024,7 +1032,7 @@ function CocMultiTimer() {
       const hash = await sha256Hex(code);
       const e = (promoDb || []).find((c) => c && c.codeHash === hash);
       if (e) {
-        if (promoEntryValid(e, isPwa)) grantUnlock(e.unlock, code);
+        if (promoEntryValid(e, isPwa)) grantUnlock(e.unlock, computeExp(e.expiry), code);
         else showToast(t("adWrong"));
         return;
       }
