@@ -69,6 +69,7 @@
         <button class="tab on" data-t="names" onclick="switchTab('names')">이름 수정</button>
         <button class="tab" data-t="gd" onclick="switchTab('gd')">게임데이터 수정</button>
         <button class="tab" data-t="promo" onclick="switchTab('promo')">프로모션</button>
+        <button class="tab" data-t="suggest" onclick="switchTab('suggest')">요청사항</button>
       </div>
       <div class="row2">
         <select id="langsel" class="lang" onchange="setLang(this.value)"></select>
@@ -113,10 +114,15 @@ const LANG_LABEL={ko:"한국어",en:"English",zh:"中文",ja:"日本語",de:"Deu
 const GD_FILE="gamedata.json";
 const namesPath=(l)=>"names/"+l+".json";
 const PROMO_FILE="promo-codes.json";
+// 이름 제안(요청사항): 앱이 Google Form으로 보낸 응답 Sheet를 'CSV로 웹 게시'한 URL.
+// 발행: Google Sheets(폼 응답) → 파일 → 공유 → 웹에 게시 → 응답시트 선택 → CSV → URL 복사.
+// 열 순서 가정: [타임스탬프, id, 이름, 언어]. 다르면 SUGGEST_COLS 인덱스 조정.
+const SUGGEST_CSV_URL="";
+const SUGGEST_COLS={ts:0,id:1,name:2,lang:3};
 const PROMO_SCHEMA={version:1,comment:"CCTimer promo codes. SHA-256 hashed; plaintext never stored.",match:"codeHash = SHA-256 hex of trim+UPPERCASE(code)"};
 const UNLOCKS=["all","ad_free","sync","pro"], PLATFORMS=["all","android","ios"];
 
-let token="", shas={}, orig={gd:{}}, rows=[], byId={}, curTab="names", curCat="", curSort="id", editLang="ko", editId=null, promoRows=[], promoEditIdx=-1;
+let token="", shas={}, orig={gd:{}}, rows=[], byId={}, curTab="names", curCat="", curSort="id", editLang="ko", editId=null, promoRows=[], promoEditIdx=-1, suggestRows=[], suggestPending={};
 
 async function sha256Hex(s){ const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
 
@@ -198,12 +204,13 @@ function setSort(v){ curSort=v; renderList(); }
 function setLang(v){ editLang=v; renderList(); }
 function switchTab(t){
   curTab=t; document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
-  const promo=t==="promo";
+  const promo=t==="promo", custom=(t==="promo"||t==="suggest");
   document.getElementById("addPromoBtn").style.display=promo?"":"none";
-  document.getElementById("cats").style.display=promo?"none":"";
-  document.getElementById("sort").style.display=promo?"none":"";
+  document.getElementById("cats").style.display=custom?"none":"";
+  document.getElementById("sort").style.display=custom?"none":"";
   document.getElementById("q").placeholder=promo?"검색 (라벨·unlock·해시)":"검색 (이름·ID)";
-  renderLangSel(); renderList();
+  renderLangSel();
+  if(t==="suggest" && suggestRows.length===0) fetchSuggest(); else renderList();
 }
 
 function gdDirty(r){
@@ -229,6 +236,7 @@ function sortedRows(){
 function renderList(){
   const q=document.getElementById("q").value.trim().toLowerCase();
   if(curTab==="promo") return renderPromoList(q);
+  if(curTab==="suggest") return renderSuggestList(q);
   const L=document.getElementById("list"); L.innerHTML="";
   const frag=document.createDocumentFragment(); let shown=0,dirty=0;
   sortedRows().forEach(r=>{
@@ -255,6 +263,59 @@ function renderList(){
   });
   L.appendChild(frag);
   document.getElementById("status").textContent=`${shown}개 표시 · 변경 ${dirty}개`+(dirty?" (저장 누르면 반영)":"")+(curTab==="names"?` · 편집언어: ${LANG_LABEL[editLang]||editLang}`:"");
+}
+
+// ── 요청사항(이름 제안 모더레이션) 탭 ──
+function suggestDoneSet(){ try{ return new Set(JSON.parse(localStorage.getItem("suggest_done")||"[]")); }catch(e){ return new Set(); } }
+function suggestSig(s){ return s.id+"|"+s.lang+"|"+s.name+"|"+s.ts; }
+function parseCSV(txt){
+  const out=[]; let i=0,f="",row=[],q=false;
+  while(i<txt.length){ const c=txt[i];
+    if(q){ if(c==='"'){ if(txt[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else { if(c==='"') q=true; else if(c===','){ row.push(f); f=""; } else if(c==='\n'){ row.push(f); out.push(row); row=[]; f=""; } else if(c!=='\r') f+=c; }
+    i++;
+  }
+  if(f!==""||row.length){ row.push(f); out.push(row); }
+  return out;
+}
+async function fetchSuggest(){
+  const L=document.getElementById("list"), st=document.getElementById("status");
+  if(!SUGGEST_CSV_URL){ st.textContent=""; L.innerHTML='<div class="muted" style="padding:14px;line-height:1.8">요청사항을 보려면 폼 응답 시트를 <b>CSV로 웹 게시</b>하고 editor.html의 <code>SUGGEST_CSV_URL</code>을 설정하세요.<br>Google Sheets(폼 응답) → 파일 → 공유 → 웹에 게시 → (응답시트, CSV) → URL 복사.</div>'; return; }
+  st.textContent="불러오는 중…";
+  try{
+    const r=await fetch(SUGGEST_CSV_URL); const txt=await r.text();
+    const m=parseCSV(txt); m.shift();
+    suggestRows=m.map(c=>({ ts:(c[SUGGEST_COLS.ts]||"").trim(), id:(c[SUGGEST_COLS.id]||"").trim(), name:(c[SUGGEST_COLS.name]||"").trim(), lang:(c[SUGGEST_COLS.lang]||"").trim() })).filter(s=>s.id&&s.name).reverse();
+    renderList();
+  }catch(e){ st.textContent="불러오기 실패: "+e.message+" (CSV 게시·URL·열순서 확인)"; }
+}
+function renderSuggestList(q){
+  const L=document.getElementById("list"); L.innerHTML="";
+  const done=suggestDoneSet();
+  const frag=document.createDocumentFragment(); let shown=0;
+  suggestRows.forEach((s,idx)=>{
+    if(done.has(suggestSig(s))||suggestPending[suggestSig(s)]) return;
+    if(q && !((s.id+" "+s.name).toLowerCase().includes(q))) return;
+    shown++;
+    const cur=(byId[s.id] && byId[s.id].names[s.lang])||"";
+    const curTxt = cur ? esc(cur) : '<span class="miss">(없음)</span>';
+    const el=document.createElement("div"); el.className="item";
+    el.innerHTML=`<span class="id">${esc(s.id)}<br><small>${esc(s.lang)}</small></span><span class="nm">${curTxt} → <b style="color:var(--gold)">${esc(s.name)}</b></span>`+
+      `<button class="ptgl" onclick="approveSuggest(${idx})">승인</button><button class="ptgl off" onclick="discardSuggest(${idx})">버림</button>`;
+    frag.appendChild(el);
+  });
+  L.appendChild(frag);
+  document.getElementById("status").textContent = SUGGEST_CSV_URL ? `요청 ${shown}건 · 승인=저장 눌러야 이름DB 반영, 버림=즉시 제거` : "";
+}
+function approveSuggest(idx){
+  const s=suggestRows[idx]; const r=byId[s.id];
+  if(!r){ alert("이 ID("+s.id+")가 게임데이터/이름 목록에 없어요"); return; }
+  let v=s.name; if(isBBlang(s.lang)&&BB_IDS.has(+s.id)&&v&&!v.endsWith("_BB")) v+="_BB";
+  r.names[s.lang]=v; suggestPending[suggestSig(s)]=true; renderList();
+}
+function discardSuggest(idx){
+  const s=suggestRows[idx]; const done=suggestDoneSet(); done.add(suggestSig(s));
+  localStorage.setItem("suggest_done", JSON.stringify([...done])); renderList();
 }
 
 // ── 프로모션 코드 탭 ──
@@ -390,6 +451,9 @@ async function saveAll(){
     // 프로모션 코드
     const promoObj={_schema:(orig.promo&&orig.promo._schema)||PROMO_SCHEMA, codes:promoRows};
     if(JSON.stringify(promoObj)!==JSON.stringify(orig.promo||{})){ st.textContent="저장 중: "+PROMO_FILE+"…"; await putFile(PROMO_FILE, JSON.stringify(promoObj,null,2), "promo"); orig.promo=promoObj; n++; }
+    // 승인한 이름 제안을 처리완료로 확정(저장 후)
+    const pend=Object.keys(suggestPending);
+    if(pend.length){ const done=suggestDoneSet(); pend.forEach(k=>done.add(k)); localStorage.setItem("suggest_done",JSON.stringify([...done])); suggestPending={}; }
     buildRows(); renderList();
     st.textContent = n?`✓ 저장됨 (${n}개 파일) — 1~2분 뒤 앱에 반영`:"변경 없음";
   }catch(e){ st.textContent="저장 실패: "+e.message; }
