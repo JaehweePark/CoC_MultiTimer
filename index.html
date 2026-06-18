@@ -566,7 +566,6 @@ const FILTER_ACC_KEY = "coc-multi-timer-filter-acc";
 const FONT_SCALE_KEY = "coc-multi-timer-font-scale";
 const FS_MIN = 0.7, FS_MAX = 1.6;
 const NAME_OVERRIDE_KEY = "coc-multi-timer-name-override";
-const BUILDER_REMINDER_KEY = "coc-multi-timer-builder-reminder";
 const SORT_KEY = "coc-multi-timer-sort";
 const THEME_KEY = "coc-multi-timer-theme";
 const ONBOARDED_KEY = "coc-multi-timer-onboarded";
@@ -577,6 +576,8 @@ const PUBLIC_GAMEDATA_URL = "https://jaehweepark.github.io/CoC_MultiTimer/gameda
 const SUGGEST_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSdroVyqUYGL6XMWWssRPswZUplxXhB_tEznhVQZzLo00tEJOQ/viewform";
 const SUGGEST_ENTRY = { id: "entry.158863278", name: "entry.286539750", lang: "entry.1931750880" };
 const ALERT_LEADS = [0, 0.5, 1, 5, 10, 30];
+const ALERT_CAT_KEY = "coc-multi-timer-alert-cat";
+const ALERT_ACC_KEY = "coc-multi-timer-alert-acc";
 function fmtLead(m, lang) {
   if (m === 0) return lang === "ko" ? "\uC989\uC2DC" : "Now";
   if (m < 1) return Math.round(m * 60) + (lang === "ko" ? "\uCD08" : "s");
@@ -586,7 +587,7 @@ const PROMO_CODES = { NOADJH: 0 };
 const DISABLE_CODE = "YSADJH";
 const BACKUP_CODE = "JAYJAY";
 const BACKUP_KEY = "coc-multi-timer-backup";
-const SYNC_KEYS = [STORAGE_KEY, ALERTS_KEY, LANG_KEY, KEEPAWAKE_KEY];
+const SYNC_KEYS = [STORAGE_KEY, ALERTS_KEY, LANG_KEY, KEEPAWAKE_KEY, NAME_OVERRIDE_KEY];
 const AUTOSYNC_KEY = "coc-multi-timer-autosync";
 const DRIVE_EMAIL_KEY = "coc-multi-timer-driveemail";
 function mergeAccounts(localArr, remoteArr) {
@@ -677,17 +678,18 @@ function CocMultiTimer() {
   const [editTarget, setEditTarget] = useState(null);
   const [publicGameData, setPublicGameData] = useState({});
   const [alertLeads, setAlertLeads] = useState([0]);
-  const [builderReminder, setBuilderReminder] = useState(true);
+  const [alertCatOff, setAlertCatOff] = useState([]);
+  const [alertAccOff, setAlertAccOff] = useState([]);
+  const [alertCfgOpen, setAlertCfgOpen] = useState(false);
   const [sortMode, setSortMode] = useState("finish");
-  const [search, setSearch] = useState("");
   const [theme, setTheme] = useState("dark");
   const [customTimer, setCustomTimer] = useState(null);
   const [importText, setImportText] = useState(null);
-  const [dismissed, setDismissed] = useState([]);
   const [onboarded, setOnboarded] = useState(true);
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [driveEmail, setDriveEmail] = useState(null);
   const [driveBusy, setDriveBusy] = useState(false);
+  const [driveProg, setDriveProg] = useState(null);
   const [autoSync, setAutoSync] = useState(true);
   const wakeLockRef = useRef(null);
   const toastRef = useRef(null);
@@ -753,6 +755,22 @@ function CocMultiTimer() {
       } catch (e) {
       }
       try {
+        const ac = await storage.get(ALERT_CAT_KEY);
+        if (ac?.value) {
+          const arr = JSON.parse(ac.value);
+          if (Array.isArray(arr)) setAlertCatOff(arr);
+        }
+      } catch (e) {
+      }
+      try {
+        const aa = await storage.get(ALERT_ACC_KEY);
+        if (aa?.value) {
+          const arr = JSON.parse(aa.value);
+          if (Array.isArray(arr)) setAlertAccOff(arr);
+        }
+      } catch (e) {
+      }
+      try {
         const fz = await storage.get(FONT_SCALE_KEY);
         if (fz?.value) {
           const v = parseFloat(fz.value);
@@ -769,11 +787,6 @@ function CocMultiTimer() {
           const o = JSON.parse(no.value);
           if (o && typeof o === "object") setNameOverride(o);
         }
-      } catch (e) {
-      }
-      try {
-        const br = await storage.get(BUILDER_REMINDER_KEY);
-        if (br?.value != null) setBuilderReminder(br.value !== "0");
       } catch (e) {
       }
       try {
@@ -875,7 +888,7 @@ function CocMultiTimer() {
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     };
-  }, [accounts, driveEmail, autoSync, loaded, backupEnabled]);
+  }, [accounts, nameOverride, driveEmail, autoSync, loaded, backupEnabled]);
   useEffect(() => {
     if (!window.driveSync || !driveEmail || !autoSync || !backupEnabled) return;
     const onVis = () => {
@@ -994,6 +1007,18 @@ function CocMultiTimer() {
     });
     return next;
   });
+  const toggleAlertCat = (c) => setAlertCatOff((p) => {
+    const next = p.includes(c) ? p.filter((x) => x !== c) : [...p, c];
+    storage.set(ALERT_CAT_KEY, JSON.stringify(next)).catch(() => {
+    });
+    return next;
+  });
+  const toggleAlertAcc = (id) => setAlertAccOff((p) => {
+    const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
+    storage.set(ALERT_ACC_KEY, JSON.stringify(next)).catch(() => {
+    });
+    return next;
+  });
   const applyFontScale = (s, save) => {
     const v = Math.min(FS_MAX, Math.max(FS_MIN, Math.round(s * 100) / 100));
     setFontScale(v);
@@ -1001,12 +1026,6 @@ function CocMultiTimer() {
     if (save) storage.set(FONT_SCALE_KEY, String(v)).catch(() => {
     });
   };
-  const toggleBuilderReminder = () => setBuilderReminder((p) => {
-    const next = !p;
-    storage.set(BUILDER_REMINDER_KEY, next ? "1" : "0").catch(() => {
-    });
-    return next;
-  });
   const toggleTheme = () => setTheme((p) => {
     const next = p === "light" ? "dark" : "light";
     storage.set(THEME_KEY, next).catch(() => {
@@ -1074,16 +1093,6 @@ function CocMultiTimer() {
     }
     return JSON.stringify({ schema: 1, updatedAt: Date.now(), app: "cctimer", data });
   }
-  async function importSync(jsonStr) {
-    const obj = JSON.parse(jsonStr);
-    if (!obj || typeof obj.data !== "object") throw new Error("invalid backup");
-    for (const [k, v] of Object.entries(obj.data)) {
-      try {
-        await storage.set(k, v);
-      } catch (e) {
-      }
-    }
-  }
   async function driveSignIn() {
     if (!window.driveSync) {
       showToast(t("backupUnavail"));
@@ -1125,6 +1134,19 @@ function CocMultiTimer() {
       const json = await window.driveSync.download();
       if (!json) return;
       const obj = JSON.parse(json);
+      if (obj && obj.data && obj.data[NAME_OVERRIDE_KEY]) {
+        try {
+          const ro = JSON.parse(obj.data[NAME_OVERRIDE_KEY]);
+          if (ro && typeof ro === "object") setNameOverride((prev) => {
+            const m = {};
+            for (const lng of /* @__PURE__ */ new Set([...Object.keys(prev), ...Object.keys(ro)])) m[lng] = { ...ro[lng] || {}, ...prev[lng] || {} };
+            storage.set(NAME_OVERRIDE_KEY, JSON.stringify(m)).catch(() => {
+            });
+            return m;
+          });
+        } catch (e) {
+        }
+      }
       const remoteStr = obj && obj.data && obj.data[STORAGE_KEY];
       if (!remoteStr) return;
       const remoteAcc = JSON.parse(remoteStr);
@@ -1151,45 +1173,45 @@ function CocMultiTimer() {
     }
     if (v && driveEmail) syncPull(true);
   }
-  async function doBackup() {
+  async function syncNow() {
     if (!window.driveSync) {
       showToast(t("backupUnavail"));
       return;
     }
     setDriveBusy(true);
-    try {
-      const json = await exportSync();
-      await window.driveSync.upload(json);
-      showToast(t("backupDone"));
-    } catch (e) {
-      showToast(t("backupErr"));
-    } finally {
-      setDriveBusy(false);
-    }
-  }
-  async function doRestore() {
-    if (!window.driveSync) {
-      showToast(t("backupUnavail"));
-      return;
-    }
-    setDriveBusy(true);
+    setDriveProg({ on: true });
     try {
       const json = await window.driveSync.download();
-      if (!json) {
-        showToast(t("backupNone"));
-        setDriveBusy(false);
-        return;
-      }
-      await importSync(json);
-      showToast(t("backupRestored"));
-      setTimeout(() => {
-        try {
-          location.reload();
-        } catch (e) {
+      if (json) {
+        const obj = JSON.parse(json);
+        if (obj && obj.data && obj.data[NAME_OVERRIDE_KEY]) {
+          try {
+            const ro = JSON.parse(obj.data[NAME_OVERRIDE_KEY]);
+            if (ro && typeof ro === "object") {
+              const m = {};
+              for (const lng of /* @__PURE__ */ new Set([...Object.keys(nameOverride), ...Object.keys(ro)])) m[lng] = { ...ro[lng] || {}, ...nameOverride[lng] || {} };
+              setNameOverride(m);
+              await storage.set(NAME_OVERRIDE_KEY, JSON.stringify(m));
+            }
+          } catch (e) {
+          }
         }
-      }, 900);
+        const remoteStr = obj && obj.data && obj.data[STORAGE_KEY];
+        const remoteAcc = remoteStr ? JSON.parse(remoteStr) : [];
+        if (Array.isArray(remoteAcc) && remoteAcc.length) {
+          const merged = mergeAccounts(accounts.filter((a) => !a.isSample), remoteAcc);
+          setAccounts(merged);
+          await storage.set(STORAGE_KEY, JSON.stringify(merged));
+        }
+      }
+      const out = await exportSync();
+      await window.driveSync.upload(out);
+      setDriveProg({ done: true });
+      setTimeout(() => setDriveProg(null), 1800);
     } catch (e) {
-      showToast(t("backupErr"));
+      setDriveProg({ err: true });
+      setTimeout(() => setDriveProg(null), 2500);
+    } finally {
       setDriveBusy(false);
     }
   }
@@ -1233,15 +1255,16 @@ function CocMultiTimer() {
   }, [keepAwake]);
   const baseName = (id, lg) => NAME_OVERLAY[lg] && NAME_OVERLAY[lg][id] || NAME_EN[id] || `#${id}`;
   const itemName = (id) => nameOverride[lang] && nameOverride[lang][id] || publicNames[lang] && publicNames[lang][id] || baseName(id, lang);
-  function openSuggest(id) {
-    if (!SUGGEST_FORM) return;
+  function submitSuggest(id, name) {
+    if (!SUGGEST_FORM || !name) return;
     try {
-      const u = new URL(SUGGEST_FORM);
-      u.searchParams.set("usp", "pp_url");
-      u.searchParams.set(SUGGEST_ENTRY.id, String(id));
-      u.searchParams.set(SUGGEST_ENTRY.name, itemName(id));
-      u.searchParams.set(SUGGEST_ENTRY.lang, lang);
-      openExternal(u.toString());
+      const url = SUGGEST_FORM.replace("/viewform", "/formResponse");
+      const body = new URLSearchParams();
+      body.set(SUGGEST_ENTRY.id, String(id));
+      body.set(SUGGEST_ENTRY.name, name);
+      body.set(SUGGEST_ENTRY.lang, lang);
+      fetch(url, { method: "POST", mode: "no-cors", body }).catch(() => {
+      });
     } catch (e) {
     }
   }
@@ -1260,6 +1283,7 @@ function CocMultiTimer() {
       });
       return next;
     });
+    if (v) submitSuggest(id, v);
     setEditTarget(null);
   }
   function resetEditName() {
@@ -1334,7 +1358,7 @@ function CocMultiTimer() {
     if (!loaded) return;
     const items = [];
     const nowMs = Date.now();
-    rows.filter((r) => r.finishAt).forEach((r) => {
+    rows.filter((r) => r.finishAt && !alertCatOff.includes(r.category) && !alertAccOff.includes(r.account.id)).forEach((r) => {
       const nm = r.type === "star" ? "\u2605 " + t("starBonus") : itemName(r.dataId);
       (alertLeads || []).forEach((m) => {
         const at = r.finishAt - m * 6e4;
@@ -1343,18 +1367,8 @@ function CocMultiTimer() {
         items.push({ at, title: nm, body: r.account.name + " \xB7 " + when });
       });
     });
-    if (builderReminder) {
-      const byAcc = {};
-      rows.filter((r) => r.finishAt).forEach((r) => {
-        const k = r.account.name;
-        if (!byAcc[k] || r.finishAt > byAcc[k]) byAcc[k] = r.finishAt;
-      });
-      Object.entries(byAcc).forEach(([name, at]) => {
-        if (at > nowMs + 1e3) items.push({ at, title: t("builderEmpty"), body: name });
-      });
-    }
     syncNotifications(items);
-  }, [rows, loaded, alertLeads, lang, builderReminder]);
+  }, [rows, loaded, alertLeads, lang, alertCatOff, alertAccOff]);
   useEffect(() => {
     if (!loaded) return;
     const nowMs = Date.now();
@@ -1373,22 +1387,13 @@ function CocMultiTimer() {
     storage.set("widget-data", JSON.stringify({ next, idle })).catch(() => {
     });
   }, [rows, loaded, lang, accounts]);
-  const _q = search.trim().toLowerCase();
-  const filtered = rows.filter((r) => !dismissed.includes(r.key) && !catOff.includes(r.category) && !accOff.includes(r.account.id) && (!_q || r.account.name.toLowerCase().includes(_q) || r.type === "up" && itemName(r.dataId).toLowerCase().includes(_q))).sort((a, b) => sortMode === "account" ? a.account.name.localeCompare(b.account.name) || a.remaining - b.remaining : sortMode === "category" ? String(a.category).localeCompare(String(b.category)) || a.remaining - b.remaining : a.remaining - b.remaining);
+  const filtered = rows.filter((r) => !catOff.includes(r.category) && !accOff.includes(r.account.id)).sort((a, b) => sortMode === "account" ? a.account.name.localeCompare(b.account.name) || a.remaining - b.remaining : sortMode === "category" ? String(a.category).localeCompare(String(b.category)) || a.remaining - b.remaining : a.remaining - b.remaining);
   const catOn = CAT_KEYS.filter((c) => !catOff.includes(c));
   const done = filtered.filter((r) => r.remaining <= 0);
   const upcoming = filtered.filter((r) => r.remaining > 0);
   const nextUp = filtered.find((r) => r.remaining > 0);
   const activeAccts = new Set(upcoming.map((r) => r.account.id));
   const idleCount = accounts.filter((a) => !a.isSample && !activeAccts.has(a.id)).length;
-  const resSum = {};
-  upcoming.forEach((r) => {
-    const g = r.g;
-    if (!g || r.target == null || r.target >= g.m || r.isSC) return;
-    const amt = g.c[r.target];
-    const res = Array.isArray(g.r) ? g.r[r.target] : g.r;
-    if (typeof amt === "number" && amt > 0 && res) resSum[res] = (resSum[res] || 0) + amt;
-  });
   const hasSample = accounts.some((a) => a.isSample);
   function handleImport() {
     setFormError(null);
@@ -1568,10 +1573,6 @@ function CocMultiTimer() {
     setCustomTimer(null);
   }
   const removeCustomTimer = (accId, ui) => setAccounts((p) => p.map((a) => a.id === accId ? { ...a, upgrades: a.upgrades.filter((_, i) => i !== ui) } : a));
-  const onSwipeRow = (r) => {
-    if (r.type === "custom") removeCustomTimer(r.account.id, r.ui);
-    else setDismissed((p) => p.includes(r.key) ? p : [...p, r.key]);
-  };
   async function exportData() {
     const data = JSON.stringify(accounts.filter((a) => !a.isSample));
     try {
@@ -1631,31 +1632,13 @@ function CocMultiTimer() {
     setFormError(null);
   };
   function UpgradeRow({ r }) {
-    const [dx, setDx] = useState(0);
-    const sx = useRef(0), sw = useRef(false);
-    const sp = {
-      onTouchStart: (e) => {
-        sx.current = e.touches[0].clientX;
-        sw.current = false;
-      },
-      onTouchMove: (e) => {
-        const d = e.touches[0].clientX - sx.current;
-        if (Math.abs(d) > 8) sw.current = true;
-        if (sw.current) setDx(Math.max(-110, Math.min(0, d)));
-      },
-      onTouchEnd: () => {
-        if (dx < -75) onSwipeRow(r);
-        setDx(0);
-      },
-      style: { transform: dx ? `translateX(${dx}px)` : void 0, transition: dx ? "none" : "transform .18s", touchAction: "pan-y" }
-    };
     if (r.type === "custom") {
       const ready = r.remaining <= 0;
-      return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${ready ? "done-row" : ""}`, ...sp }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS.other } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, r.customName, /* @__PURE__ */ React.createElement("button", { className: "cmt-suggest", onClick: () => removeCustomTimer(r.account.id, r.ui) }, "\u{1F5D1}")), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, ready ? t("doneBang") : fmtDuration(r.remaining, lang)), !ready && /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
+      return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${ready ? "done-row" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS.other } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, r.customName, /* @__PURE__ */ React.createElement("button", { className: "cmt-suggest", onClick: () => removeCustomTimer(r.account.id, r.ui) }, "\u{1F5D1}")), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, ready ? t("doneBang") : fmtDuration(r.remaining, lang)), !ready && /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
     }
     if (r.type === "star") {
       const ready = r.remaining <= 0;
-      return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${ready ? "done-row" : ""}`, ...sp }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS.star } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, "\u2605 ", t("starBonus")), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name), /* @__PURE__ */ React.createElement("button", { className: "cmt-link", onClick: () => clearStar(r.account.id) }, t("starCancel")))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, ready ? t("starReady") : fmtDuration(r.remaining, lang)), !ready && /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
+      return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${ready ? "done-row" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS.star } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, "\u2605 ", t("starBonus")), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name), /* @__PURE__ */ React.createElement("button", { className: "cmt-link", onClick: () => clearStar(r.account.id) }, t("starCancel")))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, ready ? t("starReady") : fmtDuration(r.remaining, lang)), !ready && /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
     }
     const g = r.g;
     const maxKnown = g && r.target !== null && r.target <= g.m;
@@ -1669,7 +1652,7 @@ function CocMultiTimer() {
       if (typeof amt === "number" && amt > 0) costStr = fmtMoney(amt) + "\xB7" + res;
     }
     const resChar = costStr && costStr.includes("\xB7") ? costStr.split("\xB7")[1] : null;
-    return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${r.remaining <= 0 ? "done-row" : r.remaining < 3600 ? "soon" : ""}`, ...sp }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS[r.category] } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, itemName(r.dataId), /* @__PURE__ */ React.createElement("button", { className: "cmt-suggest", onClick: () => openEditName(r.dataId) }, "\u270F\uFE0F ", t("suggestName")), r.isSC ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, " \xB7 ", t("supercharge"), r.sc !== null ? ` ${r.sc}` : "") : r.lvl !== null ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, "\u2192", r.target, toMax && /* @__PURE__ */ React.createElement("b", { className: "maxb" }, " ", t("maxBadge")), maxKnown && !toMax ? ` \xB7 ${t("maxLbl")} ${g.m}` : "") : null), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name), costStr !== null && /* @__PURE__ */ React.createElement("span", { className: "cmt-cost" }, t("nextCost"), ": ", resChar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("b", { style: { color: RES_COLORS[resChar] } }, costStr.split("\xB7")[0]), /* @__PURE__ */ React.createElement("span", { className: "resdot", style: { background: RES_COLORS[resChar] } })) : costStr), r.helperSec && /* @__PURE__ */ React.createElement("span", { className: "cmt-helper" }, "\u2692 ", fmtDuration(Math.max(0, r.helperSec - (now - r.account.importedAt) / 1e3), lang)))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, r.remaining <= 0 ? t("doneBang") : fmtDuration(r.remaining, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
+    return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${r.remaining <= 0 ? "done-row" : r.remaining < 3600 ? "soon" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS[r.category] } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, itemName(r.dataId), /* @__PURE__ */ React.createElement("button", { className: "cmt-suggest", onClick: () => openEditName(r.dataId), "aria-label": t("suggestName") }, "\u270F\uFE0F"), r.isSC ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, " \xB7 ", t("supercharge"), r.sc !== null ? ` ${r.sc}` : "") : r.lvl !== null ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, "\u2192", r.target, toMax && /* @__PURE__ */ React.createElement("b", { className: "maxb" }, " ", t("maxBadge")), maxKnown && !toMax ? ` \xB7 ${t("maxLbl")} ${g.m}` : "") : null), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name), costStr !== null && /* @__PURE__ */ React.createElement("span", { className: "cmt-cost" }, t("nextCost"), ": ", resChar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("b", { style: { color: RES_COLORS[resChar] } }, costStr.split("\xB7")[0]), /* @__PURE__ */ React.createElement("span", { className: "resdot", style: { background: RES_COLORS[resChar] } })) : costStr), r.helperSec && /* @__PURE__ */ React.createElement("span", { className: "cmt-helper" }, "\u2692 ", fmtDuration(Math.max(0, r.helperSec - (now - r.account.importedAt) / 1e3), lang)))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, r.remaining <= 0 ? t("doneBang") : fmtDuration(r.remaining, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
   }
   return /* @__PURE__ */ React.createElement("div", { ref: rootRef, className: "cmt-root" + (theme === "light" ? " light" : "") + (showAds ? " has-banner" : "") + (showAds && isNative ? " ads-native" : ""), dir, style: { zoom: fontScale } }, /* @__PURE__ */ React.createElement("style", null, `
         .cmt-root { min-height: 100vh; background: radial-gradient(1200px 500px at 50% -10%, rgba(245,184,46,0.07), transparent 60%), #0F1A12;
@@ -1786,6 +1769,13 @@ function CocMultiTimer() {
         [dir="rtl"] .cmt-sw.on::after { right: 22px; }
         .cmt-coderow { display: flex; gap: 8px; margin-top: 8px; }
         .cmt-coderow .cmt-input { margin-bottom: 0; }
+        .cmt-prog { margin-top: 10px; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 700;
+          background: rgba(245,184,46,0.08); border: 1px solid rgba(245,184,46,0.25); color: #C9A24B; }
+        .cmt-prog.done { background: rgba(127,203,122,0.1); border-color: rgba(127,203,122,0.35); color: #7FCB7A; }
+        .cmt-prog.err { background: rgba(224,95,95,0.1); border-color: rgba(224,95,95,0.3); color: #E08B8B; }
+        .cmt-prog-bar { height: 4px; border-radius: 99px; background: rgba(255,255,255,0.12); margin-top: 7px; overflow: hidden; }
+        .cmt-prog-bar > div { height: 100%; width: 38%; border-radius: 99px; background: #F5B82E; animation: cmtprog 1.1s ease-in-out infinite; }
+        @keyframes cmtprog { 0% { transform: translateX(-110%); } 100% { transform: translateX(360%); } }
         .cmt-codemsg { font-size: 11.5px; margin-top: 7px; font-weight: 700; }
         .cmt-banner { position: fixed; left: 0; right: 0; bottom: calc(60px + env(safe-area-inset-bottom)); z-index: 25;
           height: 52px; display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -1856,22 +1846,14 @@ function CocMultiTimer() {
   ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: confirmPendingAdd }, t("importBtn")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: () => {
     setPendingQueue((q) => q.slice(1));
     setPendingName("");
-  } }, t("cancel")))), tab === "timeline" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("p", { className: "cmt-sub" }, t("appSub")), accounts.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-tips" }, /* @__PURE__ */ React.createElement("button", { className: "cmt-tips-toggle", onClick: () => setTipsOpen((v) => !v) }, /* @__PURE__ */ React.createElement("span", null, "\u24D8 ", t("tipsLabel")), /* @__PURE__ */ React.createElement("span", { className: "caret" }, tipsOpen ? "\u25BE" : "\u25B8")), tipsOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-hint" }, t("refreshHint")), /* @__PURE__ */ React.createElement("div", { className: "cmt-hint" }, t("tideHint")))), hasSample && /* @__PURE__ */ React.createElement("div", { className: "cmt-sample-note" }, /* @__PURE__ */ React.createElement("span", null, t("sampleNote")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => setAccounts((p) => p.filter((a) => !a.isSample)) }, t("clearSample"))), !onboarded && accounts.some((a) => !a.isSample) && /* @__PURE__ */ React.createElement("div", { className: "cmt-hint", style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("b", null, "\u{1F514} ", t("onboardTitle")), /* @__PURE__ */ React.createElement("br", null), t("onboardSub")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold tiny", style: { flex: "0 0 auto" }, onClick: enableNotif }, t("onboardBtn"))), accounts.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, padding: "10px 4px 2px", fontSize: 13, color: "#B9C6B5" } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", { style: { color: "#F5F3E7", fontSize: 15 } }, upcoming.length), " ", t("sumActive")), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", { style: { color: "#F5F3E7", fontSize: 15 } }, done.length), " ", t("sumDone")), idleCount > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "#F5B82E" } }, /* @__PURE__ */ React.createElement("b", { style: { fontSize: 15 } }, idleCount), " ", t("sumIdle"))), Object.keys(resSum).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, padding: "0 4px 8px", fontSize: 12, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#8FA08C" } }, t("investing")), Object.entries(resSum).map(([res, amt]) => /* @__PURE__ */ React.createElement("span", { key: res, style: { color: RES_COLORS[res] || "#ccc", fontWeight: 800 } }, "\u25CF ", fmtMoney(amt)))), nextUp && /* @__PURE__ */ React.createElement("div", { className: "cmt-hero" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-hero-label" }, t("nextDone"), catOn.length === 1 ? " \xB7 " + t(CAT_LABEL[catOn[0]]) : ""), /* @__PURE__ */ React.createElement("div", { className: "cmt-hero-time" }, fmtCountdown(nextUp.remaining, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-hero-item" }, /* @__PURE__ */ React.createElement("b", null, nextUp.type === "star" ? "\u2605 " + t("starBonus") : itemName(nextUp.dataId)), nextUp.type === "up" && nextUp.lvl !== null && !nextUp.isSC && ` Lv.${nextUp.lvl}\u2192${nextUp.target}`, nextUp.type === "up" && nextUp.isSC && ` \xB7 ${t("supercharge")}`, " \xB7 ", nextUp.account.name, " \xB7 ", fmtFinish(nextUp.finishAt, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-bar" }, /* @__PURE__ */ React.createElement("div", { style: { width: `${Math.min(100, Math.max(2, (1 - nextUp.remaining / nextUp.total) * 100))}%` } }))), accounts.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, accounts.length > 1 && /* @__PURE__ */ React.createElement("input", { className: "cmt-input", style: { marginBottom: 8 }, placeholder: t("searchPh"), value: search, onChange: (e) => setSearch(e.target.value) }), /* @__PURE__ */ React.createElement("div", { className: "cmt-chips" }, CAT_KEYS.map((c) => /* @__PURE__ */ React.createElement("button", { key: c, className: `cmt-chip ${!catOff.includes(c) ? "on" : ""}`, onClick: () => toggleCat(c) }, /* @__PURE__ */ React.createElement("span", { className: "dot", style: { background: CAT_COLORS[c] } }), t(CAT_LABEL[c])))), accounts.length > 1 && /* @__PURE__ */ React.createElement("div", { className: "cmt-chips", style: { marginTop: 0 } }, accounts.map((a, i) => /* @__PURE__ */ React.createElement("button", { key: a.id, className: `cmt-chip ${!accOff.includes(a.id) ? "on" : ""}`, onClick: () => toggleAcc(a.id) }, /* @__PURE__ */ React.createElement("span", { className: "dot", style: { background: ACCOUNT_HUES[i % ACCOUNT_HUES.length] } }), a.name))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { className: "cmt-sub", style: { margin: 0 } }, t("sortBy")), /* @__PURE__ */ React.createElement("select", { className: "cmt-select", style: { width: "auto", flex: "0 0 auto", padding: "4px 26px 4px 8px" }, value: sortMode, onChange: (e) => {
+  } }, t("cancel")))), tab === "timeline" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("p", { className: "cmt-sub" }, t("appSub")), accounts.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-tips" }, /* @__PURE__ */ React.createElement("button", { className: "cmt-tips-toggle", onClick: () => setTipsOpen((v) => !v) }, /* @__PURE__ */ React.createElement("span", null, "\u24D8 ", t("tipsLabel")), /* @__PURE__ */ React.createElement("span", { className: "caret" }, tipsOpen ? "\u25BE" : "\u25B8")), tipsOpen && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-hint" }, t("refreshHint")), /* @__PURE__ */ React.createElement("div", { className: "cmt-hint" }, t("tideHint")))), hasSample && /* @__PURE__ */ React.createElement("div", { className: "cmt-sample-note" }, /* @__PURE__ */ React.createElement("span", null, t("sampleNote")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => setAccounts((p) => p.filter((a) => !a.isSample)) }, t("clearSample"))), !onboarded && accounts.some((a) => !a.isSample) && /* @__PURE__ */ React.createElement("div", { className: "cmt-hint", style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("b", null, "\u{1F514} ", t("onboardTitle")), /* @__PURE__ */ React.createElement("br", null), t("onboardSub")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold tiny", style: { flex: "0 0 auto" }, onClick: enableNotif }, t("onboardBtn"))), accounts.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, padding: "10px 4px 2px", fontSize: 13, color: "#B9C6B5" } }, /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", { style: { color: "#F5F3E7", fontSize: 15 } }, upcoming.length), " ", t("sumActive")), /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("b", { style: { color: "#F5F3E7", fontSize: 15 } }, done.length), " ", t("sumDone")), idleCount > 0 && /* @__PURE__ */ React.createElement("span", { style: { color: "#F5B82E" } }, /* @__PURE__ */ React.createElement("b", { style: { fontSize: 15 } }, idleCount), " ", t("sumIdle"))), nextUp && /* @__PURE__ */ React.createElement("div", { className: "cmt-hero" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-hero-label" }, t("nextDone"), catOn.length === 1 ? " \xB7 " + t(CAT_LABEL[catOn[0]]) : ""), /* @__PURE__ */ React.createElement("div", { className: "cmt-hero-time" }, fmtCountdown(nextUp.remaining, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-hero-item" }, /* @__PURE__ */ React.createElement("b", null, nextUp.type === "star" ? "\u2605 " + t("starBonus") : itemName(nextUp.dataId)), nextUp.type === "up" && nextUp.lvl !== null && !nextUp.isSC && ` Lv.${nextUp.lvl}\u2192${nextUp.target}`, nextUp.type === "up" && nextUp.isSC && ` \xB7 ${t("supercharge")}`, " \xB7 ", nextUp.account.name, " \xB7 ", fmtFinish(nextUp.finishAt, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-bar" }, /* @__PURE__ */ React.createElement("div", { style: { width: `${Math.min(100, Math.max(2, (1 - nextUp.remaining / nextUp.total) * 100))}%` } }))), accounts.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-chips" }, CAT_KEYS.map((c) => /* @__PURE__ */ React.createElement("button", { key: c, className: `cmt-chip ${!catOff.includes(c) ? "on" : ""}`, onClick: () => toggleCat(c) }, /* @__PURE__ */ React.createElement("span", { className: "dot", style: { background: CAT_COLORS[c] } }), t(CAT_LABEL[c])))), accounts.length > 1 && /* @__PURE__ */ React.createElement("div", { className: "cmt-chips", style: { marginTop: 0 } }, accounts.map((a, i) => /* @__PURE__ */ React.createElement("button", { key: a.id, className: `cmt-chip ${!accOff.includes(a.id) ? "on" : ""}`, onClick: () => toggleAcc(a.id) }, /* @__PURE__ */ React.createElement("span", { className: "dot", style: { background: ACCOUNT_HUES[i % ACCOUNT_HUES.length] } }), a.name))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 } }, /* @__PURE__ */ React.createElement("span", { className: "cmt-sub", style: { margin: 0 } }, t("sortBy")), /* @__PURE__ */ React.createElement("select", { className: "cmt-select", style: { width: "auto", flex: "0 0 auto", padding: "4px 26px 4px 8px" }, value: sortMode, onChange: (e) => {
     setSortMode(e.target.value);
     storage.set(SORT_KEY, e.target.value).catch(() => {
     });
   } }, /* @__PURE__ */ React.createElement("option", { value: "finish" }, t("sortFinish")), /* @__PURE__ */ React.createElement("option", { value: "account" }, t("sortAccount")), /* @__PURE__ */ React.createElement("option", { value: "category" }, t("sortCategory"))))), done.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "cmt-section cmt-collapse", onClick: () => setDoneOpen((v) => !v) }, /* @__PURE__ */ React.createElement("span", { className: "caret" }, doneOpen ? "\u25BE" : "\u25B8"), /* @__PURE__ */ React.createElement("span", null, "\u2713 ", t("doneTitle"), " \xB7 ", done.length)), doneOpen && done.map((r) => /* @__PURE__ */ React.createElement(UpgradeRow, { key: r.key, r }))), upcoming.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-section" }, t("inProgress"), " \xB7 ", upcoming.length), upcoming.map((r) => /* @__PURE__ */ React.createElement(UpgradeRow, { key: r.key, r }))), accounts.some((a) => !a.isSample) && /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", style: { width: "100%", marginTop: 10 }, onClick: () => setCustomTimer({ accId: accounts.find((a) => !a.isSample)?.id || "", name: "", h: "", m: "" }) }, "+ ", t("addCustom")), accounts.length === 0 && loaded && !addOpen && /* @__PURE__ */ React.createElement("div", { className: "cmt-empty" }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 6, opacity: 0.9 } }, "\u{1F3F0}"), /* @__PURE__ */ React.createElement("b", { style: { color: "#E8E2CE" } }, t("emptyTitle")), /* @__PURE__ */ React.createElement("br", null), t("emptySub"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: openAdd }, "+ ", t("addAccount")), " ", /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: () => setAccounts(sampleAccounts(Date.now())) }, t("sample")))), tab === "accounts" && /* @__PURE__ */ React.createElement(React.Fragment, null, accounts.length === 0 && loaded && !addOpen && /* @__PURE__ */ React.createElement("div", { className: "cmt-empty" }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 46, marginBottom: 6, opacity: 0.9 } }, "\u{1F3F0}"), /* @__PURE__ */ React.createElement("b", { style: { color: "#E8E2CE" } }, t("emptyTitle")), /* @__PURE__ */ React.createElement("br", null), t("emptySub"), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: openAdd }, "+ ", t("addAccount"))), accounts.length > 0 && /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", style: { marginBottom: 12 }, onClick: openRefresh }, "\u{1F504} ", t("reimport")), accounts.map((a, i) => /* @__PURE__ */ React.createElement("div", { key: a.id, className: "cmt-acc-card" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-acc-top" }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, renameId === a.id ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("input", { className: "cmt-input", style: { marginBottom: 0 }, value: renameVal, onChange: (e) => setRenameVal(e.target.value), autoFocus: true }), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny gold", onClick: saveRename }, t("save")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => setRenameId(null) }, t("cancel"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "nm", style: { color: ACCOUNT_HUES[i % ACCOUNT_HUES.length] } }, a.name, " ", a.tag && /* @__PURE__ */ React.createElement("span", { style: { color: "#7E8F7B", fontWeight: 600, fontSize: 11 } }, a.tag)), /* @__PURE__ */ React.createElement("div", { className: "info" }, t("upgrades"), " ", (a.upgrades || []).length, " \xB7 ", t("dataAsOf"), " ", new Date(a.importedAt).toLocaleString(lang || "en", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, flex: "none" } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => move(i, -1), disabled: i === 0, style: { opacity: i === 0 ? 0.35 : 1 } }, "\u2191"), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => move(i, 1), disabled: i === accounts.length - 1, style: { opacity: i === accounts.length - 1 ? 0.35 : 1 } }, "\u2193"))), (Object.keys(a.helpers || {}).length > 0 || Object.keys(a.boosts || {}).length > 0 || STAR_ENABLED && a.starBonusAt) && /* @__PURE__ */ React.createElement("div", { className: "cmt-tags" }, Object.entries(a.helpers || {}).map(([hid, lvl]) => /* @__PURE__ */ React.createElement("span", { key: hid, className: "cmt-tag" }, "\u2692 ", t(HELPER_KEYS[hid] || "helpers"), lvl !== null ? ` Lv.${lvl}` : "")), Object.entries(a.boosts || {}).map(([k, v]) => /* @__PURE__ */ React.createElement("span", { key: k, className: "cmt-tag" }, "\u23F1 ", k === "clocktower_cooldown" ? t("clockTower") : k, " ", fmtDuration(Math.max(0, v - (now - a.importedAt) / 1e3), lang))), STAR_ENABLED && a.starBonusAt && /* @__PURE__ */ React.createElement("span", { className: "cmt-tag", style: { color: "#F0E68C" } }, "\u2605 ", t("starUntil"), " ", fmtDuration(Math.max(0, (a.starBonusAt + 864e5 - now) / 1e3), lang))), /* @__PURE__ */ React.createElement("div", { className: "cmt-acc-actions" }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => {
     setRenameId(a.id);
     setRenameVal(a.name);
-  } }, t("rename")), STAR_ENABLED && !a.starBonusAt && /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => markStar(a.id) }, t("starMark")), confirmDel === a.id ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny danger", onClick: () => removeAccount(a.id) }, t("confirmDel")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => setConfirmDel(null) }, t("cancel"))) : /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny danger", onClick: () => setConfirmDel(a.id) }, t("del")))))), tab === "settings" && /* @__PURE__ */ React.createElement("div", { className: "cmt-help" }, DONATE_URL && /* @__PURE__ */ React.createElement("div", { className: "cmt-donate-card" }, /* @__PURE__ */ React.createElement("div", { className: "dc-title" }, t("donateTitle")), /* @__PURE__ */ React.createElement("div", { className: "dc-sub" }, t("donateWit")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn donate", onClick: () => openExternal(DONATE_URL) }, t("donate")), PAYPAL_URL && /* @__PURE__ */ React.createElement("button", { className: "cmt-btn donate", style: { marginTop: 8 }, onClick: () => openExternal(PAYPAL_URL) }, t("paypal"))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section" }, t("general")), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle", style: { display: "block" } }, /* @__PURE__ */ React.createElement("div", { className: "lbl", style: { marginBottom: 2 } }, t("fontSize")), /* @__PURE__ */ React.createElement("div", { className: "sub", style: { marginBottom: 8 } }, t("fontSizeSub")), /* @__PURE__ */ React.createElement("div", { className: "cmt-chips", style: { marginTop: 0 } }, [["fsSmall", 0.85], ["fsNormal", 1], ["fsLarge", 1.2]].map(([lbl, v]) => /* @__PURE__ */ React.createElement("button", { key: lbl, className: "cmt-chip" + (Math.abs(fontScale - v) < 0.01 ? " on" : ""), onClick: () => applyFontScale(v, true) }, t(lbl))))), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "lbl" }, t("keepScreen")), /* @__PURE__ */ React.createElement("div", { className: "sub" }, t("keepScreenSub"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-sw" + (keepAwake ? " on" : ""), onClick: toggleKeepAwake, "aria-label": t("keepScreen") })), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "lbl" }, t("lightMode"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-sw" + (theme === "light" ? " on" : ""), onClick: toggleTheme, "aria-label": t("lightMode") })), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle", style: { display: "block" } }, /* @__PURE__ */ React.createElement("div", { className: "lbl", style: { marginBottom: 4 } }, t("adRemove")), /* @__PURE__ */ React.createElement("div", { className: "cmt-coderow" }, /* @__PURE__ */ React.createElement(
-    "input",
-    {
-      className: "cmt-input",
-      placeholder: t("adRemovePh"),
-      value: codeInput,
-      onChange: (e) => setCodeInput(e.target.value)
-    }
-  ), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: applyCode }, t("adApply")))), backupEnabled && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, "\u2601\uFE0F ", t("backupTitle")), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 10px" } }, t("backupSub")), driveEmail ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-hint", style: { marginBottom: 10 } }, t("backupAccount"), ": ", /* @__PURE__ */ React.createElement("b", null, driveEmail)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", disabled: driveBusy, onClick: doBackup }, "\u2B06 ", t("backupNow")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", disabled: driveBusy, onClick: doRestore }, "\u2B07 ", t("backupRestore")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", disabled: driveBusy, onClick: driveSignOut }, t("backupSignOut"))), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle", style: { marginTop: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "lbl" }, t("autoSyncLabel")), /* @__PURE__ */ React.createElement("div", { className: "sub" }, t("autoSyncSub"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-sw" + (autoSync ? " on" : ""), onClick: toggleAutoSync, "aria-label": t("autoSyncLabel") }))) : /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", disabled: driveBusy, onClick: driveSignIn }, t("backupConnect"))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("alerts")), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "lbl" }, t("builderReminder")), /* @__PURE__ */ React.createElement("div", { className: "sub" }, t("builderReminderSub"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-sw" + (builderReminder ? " on" : ""), onClick: toggleBuilderReminder, "aria-label": t("builderReminder") })), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 8px" } }, t("alertsSub")), /* @__PURE__ */ React.createElement("div", { className: "cmt-chips", style: { marginTop: 0 } }, ALERT_LEADS.map((m) => /* @__PURE__ */ React.createElement("button", { key: m, className: "cmt-chip" + (alertLeads.includes(m) ? " on" : ""), onClick: () => toggleLead(m) }, fmtLead(m, lang)))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("dataTransfer")), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 8px" } }, t("dataTransferSub")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: exportData }, "\u2B06 ", t("exportCopy")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: () => setImportText("") }, "\u2B07 ", t("importPaste"))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("lang")), /* @__PURE__ */ React.createElement("select", { className: "cmt-select", value: langPref || "", onChange: (e) => changeLang(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, t("langSystem")), LANGS.map(([code, label]) => /* @__PURE__ */ React.createElement("option", { key: code, value: code }, label))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("help")), /* @__PURE__ */ React.createElement("h4", null, "\u{1F4E5} ", t("helpAddT")), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "1"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut1"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step1.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "2"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut2"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step2.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "3"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut3"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step3.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "4"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut4"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step4.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("h4", null, "\u{1F504} ", t("helpReT")), /* @__PURE__ */ React.createElement("ol", null, t("helpRe").map((s, i) => /* @__PURE__ */ React.createElement("li", { key: i }, s))), STAR_ENABLED && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h4", null, "\u2605 ", t("helpStarT")), /* @__PURE__ */ React.createElement("p", null, t("helpStar"))), /* @__PURE__ */ React.createElement("h4", null, "\u{1F4B0} ", t("helpDataT")), /* @__PURE__ */ React.createElement("p", null, t("helpData")), /* @__PURE__ */ React.createElement("p", { style: { marginTop: 18, opacity: 0.7 } }, t("storageNote")), typeof window !== "undefined" && window.__PWA__ && /* @__PURE__ */ React.createElement(
+  } }, t("rename")), STAR_ENABLED && !a.starBonusAt && /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => markStar(a.id) }, t("starMark")), confirmDel === a.id ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny danger", onClick: () => removeAccount(a.id) }, t("confirmDel")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny ghost", onClick: () => setConfirmDel(null) }, t("cancel"))) : /* @__PURE__ */ React.createElement("button", { className: "cmt-btn tiny danger", onClick: () => setConfirmDel(a.id) }, t("del")))))), tab === "settings" && /* @__PURE__ */ React.createElement("div", { className: "cmt-help" }, DONATE_URL && /* @__PURE__ */ React.createElement("div", { className: "cmt-donate-card" }, /* @__PURE__ */ React.createElement("div", { className: "dc-title" }, t("donateTitle")), /* @__PURE__ */ React.createElement("div", { className: "dc-sub" }, t("donateWit")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn donate", onClick: () => openExternal(DONATE_URL) }, t("donate")), PAYPAL_URL && /* @__PURE__ */ React.createElement("button", { className: "cmt-btn donate", style: { marginTop: 8 }, onClick: () => openExternal(PAYPAL_URL) }, t("paypal"))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section" }, t("general")), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle", style: { display: "block" } }, /* @__PURE__ */ React.createElement("div", { className: "lbl", style: { marginBottom: 2 } }, t("fontSize")), /* @__PURE__ */ React.createElement("div", { className: "sub", style: { marginBottom: 8 } }, t("fontSizeSub")), /* @__PURE__ */ React.createElement("div", { className: "cmt-chips", style: { marginTop: 0 } }, [["fsSmall", 0.85], ["fsNormal", 1], ["fsLarge", 1.2]].map(([lbl, v]) => /* @__PURE__ */ React.createElement("button", { key: lbl, className: "cmt-chip" + (Math.abs(fontScale - v) < 0.01 ? " on" : ""), onClick: () => applyFontScale(v, true) }, t(lbl))))), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "lbl" }, t("keepScreen")), /* @__PURE__ */ React.createElement("div", { className: "sub" }, t("keepScreenSub"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-sw" + (keepAwake ? " on" : ""), onClick: toggleKeepAwake, "aria-label": t("keepScreen") })), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "lbl" }, t("lightMode"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-sw" + (theme === "light" ? " on" : ""), onClick: toggleTheme, "aria-label": t("lightMode") })), backupEnabled && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, "\u2601\uFE0F ", t("backupTitle")), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 10px" } }, t("backupSub")), driveEmail ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "cmt-hint", style: { marginBottom: 10 } }, t("backupAccount"), ": ", /* @__PURE__ */ React.createElement("b", null, driveEmail)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", disabled: driveBusy, onClick: syncNow }, "\u{1F504} ", lang === "ko" ? "\uB3D9\uAE30\uD654" : "Sync now"), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", disabled: driveBusy, onClick: driveSignOut }, t("backupSignOut"))), driveProg && /* @__PURE__ */ React.createElement("div", { className: "cmt-prog" + (driveProg.done ? " done" : driveProg.err ? " err" : "") }, driveProg.err ? t("backupErr") : driveProg.done ? t("syncDone") : lang === "ko" ? "\uB3D9\uAE30\uD654 \uC911\u2026" : "Syncing\u2026", !driveProg.done && !driveProg.err && /* @__PURE__ */ React.createElement("div", { className: "cmt-prog-bar" }, /* @__PURE__ */ React.createElement("div", null))), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle", style: { marginTop: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "lbl" }, t("autoSyncLabel")), /* @__PURE__ */ React.createElement("div", { className: "sub" }, t("autoSyncSub"))), /* @__PURE__ */ React.createElement("button", { className: "cmt-sw" + (autoSync ? " on" : ""), onClick: toggleAutoSync, "aria-label": t("autoSyncLabel") }))) : /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", disabled: driveBusy, onClick: driveSignIn }, t("backupConnect"))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("alerts")), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 8px" } }, t("alertsSub")), /* @__PURE__ */ React.createElement("div", { className: "cmt-chips", style: { marginTop: 0 } }, ALERT_LEADS.map((m) => /* @__PURE__ */ React.createElement("button", { key: m, className: "cmt-chip" + (alertLeads.includes(m) ? " on" : ""), onClick: () => toggleLead(m) }, fmtLead(m, lang)))), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", style: { marginTop: 10 }, onClick: () => setAlertCfgOpen(true) }, "\u{1F514} ", lang === "ko" ? "\uC54C\uB78C \uD544\uD130 \uC124\uC815" : "Alert filter"), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("dataTransfer")), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 8px" } }, t("dataTransferSub")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: exportData }, "\u2B06 ", t("exportCopy")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: () => setImportText("") }, "\u2B07 ", t("importPaste"))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("lang")), /* @__PURE__ */ React.createElement("select", { className: "cmt-select", value: langPref || "", onChange: (e) => changeLang(e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, t("langSystem")), LANGS.map(([code, label]) => /* @__PURE__ */ React.createElement("option", { key: code, value: code }, label))), /* @__PURE__ */ React.createElement("div", { className: "cmt-section", style: { marginTop: 26 } }, t("help")), /* @__PURE__ */ React.createElement("h4", null, "\u{1F4E5} ", t("helpAddT")), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "1"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut1"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step1.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "2"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut2"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step2.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "3"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut3"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step3.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("div", { className: "cmt-tut-step" }, /* @__PURE__ */ React.createElement("span", { className: "n" }, "4"), /* @__PURE__ */ React.createElement("span", { className: "cap" }, t("tut4"))), /* @__PURE__ */ React.createElement("img", { className: "cmt-tut-img", src: "tutorial/step4.jpg", alt: "", loading: "lazy" }), /* @__PURE__ */ React.createElement("h4", null, "\u{1F504} ", t("helpReT")), /* @__PURE__ */ React.createElement("ol", null, t("helpRe").map((s, i) => /* @__PURE__ */ React.createElement("li", { key: i }, s))), STAR_ENABLED && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h4", null, "\u2605 ", t("helpStarT")), /* @__PURE__ */ React.createElement("p", null, t("helpStar"))), /* @__PURE__ */ React.createElement("h4", null, "\u{1F4B0} ", t("helpDataT")), /* @__PURE__ */ React.createElement("p", null, t("helpData")), /* @__PURE__ */ React.createElement("p", { style: { marginTop: 18, opacity: 0.7 } }, t("storageNote")), typeof window !== "undefined" && window.__PWA__ && /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "cmt-btn ghost",
@@ -1884,7 +1866,15 @@ function CocMultiTimer() {
     },
     "\u{1F514} ",
     lang === "ko" ? "1\uBD84 \uB4A4 \uD14C\uC2A4\uD2B8 \uC54C\uB9BC" : "Test notification in 1 min"
-  ))), showAds && !isNative && /* @__PURE__ */ React.createElement("div", { className: "cmt-banner" }, /* @__PURE__ */ React.createElement("span", { className: "tag" }, "AD"), t("adLabel")), ingestResult && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: closeIngestResult }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u{1F504} ", t("refreshResult")), /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestTotal")), /* @__PURE__ */ React.createElement("b", null, ingestResult.total)), /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestUpdated")), /* @__PURE__ */ React.createElement("b", null, ingestResult.updNames.length)), ingestResult.newCount > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestNew")), /* @__PURE__ */ React.createElement("b", null, ingestResult.newCount)), /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestStale")), /* @__PURE__ */ React.createElement("b", null, ingestResult.staleN)), ingestResult.noTimerN > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestNoTimer")), /* @__PURE__ */ React.createElement("b", null, ingestResult.noTimerN)), ingestResult.updNames.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-names" }, ingestResult.updNames.map((n, i) => /* @__PURE__ */ React.createElement("span", { key: i, className: "cmt-tag" }, n))), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", style: { width: "100%", marginTop: 14 }, onClick: closeIngestResult }, t("ok")))), editTarget && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: () => setEditTarget(null) }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u270F\uFE0F ", t("rename")), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 10px" } }, t("renameHint")), /* @__PURE__ */ React.createElement(
+  ), /* @__PURE__ */ React.createElement("div", { className: "cmt-toggle", style: { display: "block", marginTop: 26 } }, /* @__PURE__ */ React.createElement("div", { className: "lbl", style: { marginBottom: 4 } }, t("adRemove")), /* @__PURE__ */ React.createElement("div", { className: "cmt-coderow" }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      className: "cmt-input",
+      placeholder: t("adRemovePh"),
+      value: codeInput,
+      onChange: (e) => setCodeInput(e.target.value)
+    }
+  ), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: applyCode }, t("adApply")))))), showAds && !isNative && /* @__PURE__ */ React.createElement("div", { className: "cmt-banner" }, /* @__PURE__ */ React.createElement("span", { className: "tag" }, "AD"), t("adLabel")), ingestResult && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: closeIngestResult }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u{1F504} ", t("refreshResult")), /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestTotal")), /* @__PURE__ */ React.createElement("b", null, ingestResult.total)), /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestUpdated")), /* @__PURE__ */ React.createElement("b", null, ingestResult.updNames.length)), ingestResult.newCount > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestNew")), /* @__PURE__ */ React.createElement("b", null, ingestResult.newCount)), /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestStale")), /* @__PURE__ */ React.createElement("b", null, ingestResult.staleN)), ingestResult.noTimerN > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-stat" }, /* @__PURE__ */ React.createElement("span", null, t("ingestNoTimer")), /* @__PURE__ */ React.createElement("b", null, ingestResult.noTimerN)), ingestResult.updNames.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-names" }, ingestResult.updNames.map((n, i) => /* @__PURE__ */ React.createElement("span", { key: i, className: "cmt-tag" }, n))), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", style: { width: "100%", marginTop: 14 }, onClick: closeIngestResult }, t("ok")))), alertCfgOpen && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: () => setAlertCfgOpen(false) }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u{1F514} ", lang === "ko" ? "\uC54C\uB78C \uBC1B\uC744 \uD56D\uBAA9" : "Alert filter"), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 10px" } }, lang === "ko" ? "\uC120\uD0DD(\uCF1C\uC9D0)\uD55C \uCE74\uD14C\uACE0\uB9AC\xB7\uACC4\uC815\uB9CC \uC54C\uB78C\uC744 \uBC1B\uC544\uC694." : "Only selected categories/accounts will alert."), /* @__PURE__ */ React.createElement("div", { className: "cmt-chips" }, CAT_KEYS.map((c) => /* @__PURE__ */ React.createElement("button", { key: c, className: `cmt-chip ${!alertCatOff.includes(c) ? "on" : ""}`, onClick: () => toggleAlertCat(c) }, /* @__PURE__ */ React.createElement("span", { className: "dot", style: { background: CAT_COLORS[c] } }), t(CAT_LABEL[c])))), accounts.filter((a) => !a.isSample).length > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-chips", style: { marginTop: 8 } }, accounts.filter((a) => !a.isSample).map((a, i) => /* @__PURE__ */ React.createElement("button", { key: a.id, className: `cmt-chip ${!alertAccOff.includes(a.id) ? "on" : ""}`, onClick: () => toggleAlertAcc(a.id) }, /* @__PURE__ */ React.createElement("span", { className: "dot", style: { background: ACCOUNT_HUES[i % ACCOUNT_HUES.length] } }), a.name))), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", style: { width: "100%", marginTop: 14 }, onClick: () => setAlertCfgOpen(false) }, t("ok")))), editTarget && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: () => setEditTarget(null) }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u270F\uFE0F ", t("rename")), /* @__PURE__ */ React.createElement("p", { className: "cmt-sub", style: { margin: "0 0 10px" } }, t("renameHint")), /* @__PURE__ */ React.createElement(
     "input",
     {
       className: "cmt-input",
@@ -1894,11 +1884,7 @@ function CocMultiTimer() {
       placeholder: baseName(editTarget.id, lang),
       autoFocus: true
     }
-  ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: saveEditName }, t("save")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: resetEditName }, t("resetName")), SUGGEST_FORM && /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: () => {
-    const id = editTarget.id;
-    setEditTarget(null);
-    openSuggest(id);
-  } }, t("suggestToDb"))))), customTimer && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: () => setCustomTimer(null) }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u23F1 ", t("addCustom")), /* @__PURE__ */ React.createElement("select", { className: "cmt-select", style: { marginBottom: 9 }, value: customTimer.accId, onChange: (e) => setCustomTimer((p) => ({ ...p, accId: e.target.value })) }, accounts.filter((a) => !a.isSample).map((a) => /* @__PURE__ */ React.createElement("option", { key: a.id, value: a.id }, a.name))), /* @__PURE__ */ React.createElement("input", { className: "cmt-input", placeholder: t("ctName"), value: customTimer.name, onChange: (e) => setCustomTimer((p) => ({ ...p, name: e.target.value })), autoFocus: true }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { className: "cmt-input", type: "number", inputMode: "numeric", placeholder: t("ctHours"), value: customTimer.h, onChange: (e) => setCustomTimer((p) => ({ ...p, h: e.target.value })) }), /* @__PURE__ */ React.createElement("input", { className: "cmt-input", type: "number", inputMode: "numeric", placeholder: t("ctMins"), value: customTimer.m, onChange: (e) => setCustomTimer((p) => ({ ...p, m: e.target.value })) })), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", style: { width: "100%", marginTop: 6 }, onClick: addCustomTimer }, t("save")))), importText !== null && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: () => setImportText(null) }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u2B07 ", t("importPaste")), /* @__PURE__ */ React.createElement("textarea", { className: "cmt-textarea", placeholder: t("importPh"), value: importText, onChange: (e) => setImportText(e.target.value), autoFocus: true }), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", style: { width: "100%", marginTop: 6 }, onClick: doImport }, t("importPaste")))), toast && /* @__PURE__ */ React.createElement("div", { className: "cmt-toast" }, toast), /* @__PURE__ */ React.createElement("div", { className: "cmt-tabbar" }, [["timeline", "\u23F1", "tabTimeline"], ["accounts", "\u{1F465}", "tabAccounts"], ["settings", "\u2699\uFE0F", "tabSettings"]].map(([k, ic, lbl]) => /* @__PURE__ */ React.createElement("button", { key: k, className: `cmt-tab ${tab === k ? "on" : ""}`, onClick: () => {
+  ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: saveEditName }, t("save")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: resetEditName }, t("resetName"))))), customTimer && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: () => setCustomTimer(null) }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u23F1 ", t("addCustom")), /* @__PURE__ */ React.createElement("select", { className: "cmt-select", style: { marginBottom: 9 }, value: customTimer.accId, onChange: (e) => setCustomTimer((p) => ({ ...p, accId: e.target.value })) }, accounts.filter((a) => !a.isSample).map((a) => /* @__PURE__ */ React.createElement("option", { key: a.id, value: a.id }, a.name))), /* @__PURE__ */ React.createElement("input", { className: "cmt-input", placeholder: t("ctName"), value: customTimer.name, onChange: (e) => setCustomTimer((p) => ({ ...p, name: e.target.value })), autoFocus: true }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("input", { className: "cmt-input", type: "number", inputMode: "numeric", placeholder: t("ctHours"), value: customTimer.h, onChange: (e) => setCustomTimer((p) => ({ ...p, h: e.target.value })) }), /* @__PURE__ */ React.createElement("input", { className: "cmt-input", type: "number", inputMode: "numeric", placeholder: t("ctMins"), value: customTimer.m, onChange: (e) => setCustomTimer((p) => ({ ...p, m: e.target.value })) })), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", style: { width: "100%", marginTop: 6 }, onClick: addCustomTimer }, t("save")))), importText !== null && /* @__PURE__ */ React.createElement("div", { className: "cmt-modal-ov", onClick: () => setImportText(null) }, /* @__PURE__ */ React.createElement("div", { className: "cmt-modal", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("h3", null, "\u2B07 ", t("importPaste")), /* @__PURE__ */ React.createElement("textarea", { className: "cmt-textarea", placeholder: t("importPh"), value: importText, onChange: (e) => setImportText(e.target.value), autoFocus: true }), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", style: { width: "100%", marginTop: 6 }, onClick: doImport }, t("importPaste")))), toast && /* @__PURE__ */ React.createElement("div", { className: "cmt-toast" }, toast), /* @__PURE__ */ React.createElement("div", { className: "cmt-tabbar" }, [["timeline", "\u23F1", "tabTimeline"], ["accounts", "\u{1F465}", "tabAccounts"], ["settings", "\u2699\uFE0F", "tabSettings"]].map(([k, ic, lbl]) => /* @__PURE__ */ React.createElement("button", { key: k, className: `cmt-tab ${tab === k ? "on" : ""}`, onClick: () => {
     setTab(k);
     closeForm();
   } }, /* @__PURE__ */ React.createElement("span", { className: "ic" }, ic), t(lbl)))));
