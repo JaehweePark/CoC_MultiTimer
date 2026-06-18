@@ -37,6 +37,9 @@
   .item .meta{font-size:11px;color:var(--sub);text-align:right;white-space:nowrap}
   .item.dirty{background:rgba(245,184,46,.08)}
   .item.bb .nm{color:var(--gold)}
+  .item.off{opacity:.5}
+  .ptgl{flex:none;padding:4px 11px;border-radius:99px;font-size:11px;font-weight:800;cursor:pointer;border:1px solid var(--gold);background:rgba(245,184,46,.15);color:var(--gold)}
+  .ptgl.off{border-color:#E08B8B;background:rgba(224,139,139,.12);color:#E08B8B}
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
   .modal{background:var(--card);border:1px solid var(--gold);border-radius:14px;padding:18px;width:100%;max-width:480px;max-height:90vh;overflow:auto}
   .modal h3{margin:0 0 4px;font-size:16px}.modal .mid{font-family:monospace;font-size:11px;color:var(--sub);margin-bottom:12px}
@@ -263,17 +266,18 @@ function renderPromoList(q){
     const hay=((c.label||"")+" "+(c.unlock||"")+" "+(c.codeHash||"")).toLowerCase();
     if(q && !hay.includes(q)) return;
     shown++;
-    const el=document.createElement("div"); el.className="item";
-    const off=c.enabled===false?'<span class="miss">OFF</span> ':"";
+    const el=document.createElement("div"); el.className="item"+(c.enabled===false?" off":"");
     const ex=c.expiry||{}; const exTxt = ex.mode==="date" ? ("~"+(ex.date||"?")) : ({0:"무기한",7:"1주일",30:"1개월",180:"6개월",365:"1년"}[ex.days]||((ex.days||0)+"일"));
-    el.innerHTML=`<span class="id">${esc((c.codeHash||"").slice(0,8))}</span><span class="nm">${off}${esc(c.label||"(라벨 없음)")} <small>${esc(c.unlock||"")}</small></span><span class="meta">${esc(exTxt)} · ${esc(c.platform||"all")}</span>`;
+    const tgl=`<button class="ptgl${c.enabled===false?' off':''}" onclick="togglePromoEnabled(${idx},event)">${c.enabled===false?'꺼짐':'켜짐'}</button>`;
+    el.innerHTML=`<span class="id">${esc((c.codeHash||"").slice(0,8))}</span><span class="nm">${esc(c.label||"(라벨 없음)")} <small>${esc(c.unlock||"")}</small></span><span class="meta">${esc(exTxt)} · ${esc(c.platform||"all")}</span>${tgl}`;
     el.onclick=()=>openPromoEdit(idx);
     frag.appendChild(el);
   });
   L.appendChild(frag);
   document.getElementById("status").textContent=`코드 ${promoRows.length}개 · 표시 ${shown}`+(promoDirty()?" · 변경됨(저장 누르면 반영)":"");
 }
-function openPromoNew(){ promoEditIdx=-1; renderPromoModal({unlock:"all",startDate:new Date().toISOString().slice(0,10),endDate:"",enabled:true,platform:"all",label:""}, true); }
+function togglePromoEnabled(idx, ev){ ev.stopPropagation(); promoRows[idx].enabled = (promoRows[idx].enabled===false); renderList(); }
+function openPromoNew(){ promoEditIdx=-1; renderPromoModal({unlock:"all",enabled:true,platform:"all",label:"",expiry:{mode:"duration",days:0}}, true); }
 function openPromoEdit(idx){ promoEditIdx=idx; renderPromoModal(promoRows[idx], false); }
 function renderPromoModal(c, isNew){
   document.getElementById("mTitle").textContent=isNew?"새 프로모션 코드":"코드 편집";
