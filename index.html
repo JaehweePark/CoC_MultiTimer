@@ -575,6 +575,7 @@ const PUBLIC_GAMEDATA_KEY = "coc-multi-timer-public-gamedata";
 const PUBLIC_GAMEDATA_URL = "https://jaehweepark.github.io/CoC_MultiTimer/gamedata.json";
 const PUBLIC_PROMO_URL = "https://jaehweepark.github.io/CoC_MultiTimer/promo-codes.json";
 const PROMO_CACHE_KEY = "coc-multi-timer-promo-db";
+const PROMO_USES_KEY = "coc-multi-timer-promo-uses";
 const SUGGEST_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSdroVyqUYGL6XMWWssRPswZUplxXhB_tEznhVQZzLo00tEJOQ/viewform";
 const SUGGEST_ENTRY = { id: "entry.158863278", name: "entry.286539750", lang: "entry.1931750880" };
 const ALERT_LEADS = [0, 0.5, 1, 5, 10, 30];
@@ -1032,8 +1033,27 @@ function CocMultiTimer() {
       const hash = await sha256Hex(code);
       const e = (promoDb || []).find((c) => c && c.codeHash === hash);
       if (e) {
-        if (promoEntryValid(e, isPwa)) grantUnlock(e.unlock, computeExp(e.expiry), code);
-        else showToast(t("adWrong"));
+        if (!promoEntryValid(e, isPwa)) {
+          showToast(t("adWrong"));
+          return;
+        }
+        const lim = Number(e.usesPerUser) || 0;
+        if (lim > 0) {
+          let uses = {};
+          try {
+            const u = await storage.get(PROMO_USES_KEY);
+            if (u?.value) uses = JSON.parse(u.value) || {};
+          } catch (er) {
+          }
+          if ((uses[hash] || 0) >= lim) {
+            showToast(lang === "ko" ? "\uC774\uBBF8 \uC0AC\uC6A9\uD55C \uCF54\uB4DC\uC608\uC694" : "Code already used");
+            return;
+          }
+          uses[hash] = (uses[hash] || 0) + 1;
+          storage.set(PROMO_USES_KEY, JSON.stringify(uses)).catch(() => {
+          });
+        }
+        grantUnlock(e.unlock, computeExp(e.expiry), code);
         return;
       }
     } catch (e) {
@@ -1219,7 +1239,7 @@ function CocMultiTimer() {
     } catch (e) {
     }
     try {
-      for (const k of [STORAGE_KEY, LANG_KEY, ADFREE_KEY, KEEPAWAKE_KEY, ALERTS_KEY, FILTER_CAT_KEY, FILTER_ACC_KEY, FONT_SCALE_KEY, NAME_OVERRIDE_KEY, THEME_KEY, ONBOARDED_KEY, PUBLIC_NAMES_KEY, PUBLIC_GAMEDATA_KEY, PROMO_CACHE_KEY, ALERT_CAT_KEY, ALERT_ACC_KEY, BACKUP_KEY, AUTOSYNC_KEY, DRIVE_EMAIL_KEY]) await storage.delete(k);
+      for (const k of [STORAGE_KEY, LANG_KEY, ADFREE_KEY, KEEPAWAKE_KEY, ALERTS_KEY, FILTER_CAT_KEY, FILTER_ACC_KEY, FONT_SCALE_KEY, NAME_OVERRIDE_KEY, THEME_KEY, ONBOARDED_KEY, PUBLIC_NAMES_KEY, PUBLIC_GAMEDATA_KEY, PROMO_CACHE_KEY, PROMO_USES_KEY, ALERT_CAT_KEY, ALERT_ACC_KEY, BACKUP_KEY, AUTOSYNC_KEY, DRIVE_EMAIL_KEY]) await storage.delete(k);
     } catch (e) {
     }
     try {
