@@ -592,6 +592,7 @@ const AUTOSYNC_KEY = "coc-multi-timer-autosync";
 const DRIVE_EMAIL_KEY = "coc-multi-timer-driveemail";
 function mergeAccounts(localArr, remoteArr) {
   const keyOf = (a) => a.tag || a.id;
+  const stamp = (a) => Math.max(a.updatedAt || 0, a.importedAt || 0);
   const map = /* @__PURE__ */ new Map();
   for (const a of localArr || []) {
     if (a && !a.isSample) map.set(keyOf(a), a);
@@ -599,7 +600,7 @@ function mergeAccounts(localArr, remoteArr) {
   for (const r of remoteArr || []) {
     if (!r || r.isSample) continue;
     const k = keyOf(r), cur = map.get(k);
-    if (!cur || (r.importedAt || 0) > (cur.importedAt || 0)) map.set(k, r);
+    if (!cur || stamp(r) > stamp(cur)) map.set(k, r);
   }
   return [...map.values()];
 }
@@ -872,12 +873,8 @@ function CocMultiTimer() {
     }
     if (!window.driveSync || !driveEmail || !autoSync || !backupEnabled) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(async () => {
-      try {
-        const json = await exportSync();
-        await window.driveSync.upload(json);
-      } catch (e) {
-      }
+    syncTimerRef.current = setTimeout(() => {
+      syncNow(true);
     }, 2500);
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -1193,13 +1190,15 @@ function CocMultiTimer() {
     }
     if (v && driveEmail) syncPull(true);
   }
-  async function syncNow() {
+  async function syncNow(silent) {
     if (!window.driveSync) {
-      showToast(t("backupUnavail"));
+      if (!silent) showToast(t("backupUnavail"));
       return;
     }
-    setDriveBusy(true);
-    setDriveProg({ on: true });
+    if (!silent) {
+      setDriveBusy(true);
+      setDriveProg({ on: true });
+    }
     try {
       const json = await window.driveSync.download();
       if (json) {
@@ -1210,8 +1209,10 @@ function CocMultiTimer() {
             if (ro && typeof ro === "object") {
               const m = {};
               for (const lng of /* @__PURE__ */ new Set([...Object.keys(nameOverride), ...Object.keys(ro)])) m[lng] = { ...ro[lng] || {}, ...nameOverride[lng] || {} };
-              setNameOverride(m);
-              await storage.set(NAME_OVERRIDE_KEY, JSON.stringify(m));
+              if (JSON.stringify(m) !== JSON.stringify(nameOverride)) {
+                setNameOverride(m);
+                await storage.set(NAME_OVERRIDE_KEY, JSON.stringify(m));
+              }
             }
           } catch (e) {
           }
@@ -1219,20 +1220,27 @@ function CocMultiTimer() {
         const remoteStr = obj && obj.data && obj.data[STORAGE_KEY];
         const remoteAcc = remoteStr ? JSON.parse(remoteStr) : [];
         if (Array.isArray(remoteAcc) && remoteAcc.length) {
-          const merged = mergeAccounts(accounts.filter((a) => !a.isSample), remoteAcc);
-          setAccounts(merged);
-          await storage.set(STORAGE_KEY, JSON.stringify(merged));
+          const real = accounts.filter((a) => !a.isSample);
+          const merged = mergeAccounts(real, remoteAcc);
+          if (JSON.stringify(merged) !== JSON.stringify(real)) {
+            setAccounts(merged);
+            await storage.set(STORAGE_KEY, JSON.stringify(merged));
+          }
         }
       }
       const out = await exportSync();
       await window.driveSync.upload(out);
-      setDriveProg({ done: true });
-      setTimeout(() => setDriveProg(null), 1800);
+      if (!silent) {
+        setDriveProg({ done: true });
+        setTimeout(() => setDriveProg(null), 1800);
+      }
     } catch (e) {
-      setDriveProg({ err: true });
-      setTimeout(() => setDriveProg(null), 2500);
+      if (!silent) {
+        setDriveProg({ err: true });
+        setTimeout(() => setDriveProg(null), 2500);
+      }
     } finally {
-      setDriveBusy(false);
+      if (!silent) setDriveBusy(false);
     }
   }
   useEffect(() => {
@@ -1445,10 +1453,10 @@ function CocMultiTimer() {
         setFormError(t("errStale"));
         return;
       }
-      setAccounts((p) => p.map((a) => a.id === matchId ? { ...a, importedAt: ts, upgrades: ups, helpers, boosts, tag: tag || a.tag, isSample: false } : a));
+      setAccounts((p) => p.map((a) => a.id === matchId ? { ...a, importedAt: ts, upgrades: ups, helpers, boosts, tag: tag || a.tag, isSample: false, updatedAt: Date.now() } : a));
     } else {
       const name = formName.trim() || tag || `Account ${accounts.length + 1}`;
-      setAccounts((p) => [...p.filter((a) => !a.isSample), { id: `acc-${Date.now()}`, name, tag, importedAt: ts, upgrades: ups, helpers, boosts, starBonusAt: null, isSample: false }]);
+      setAccounts((p) => [...p.filter((a) => !a.isSample), { id: `acc-${Date.now()}`, name, tag, importedAt: ts, upgrades: ups, helpers, boosts, starBonusAt: null, isSample: false, updatedAt: Date.now() }]);
     }
     setFormName("");
     setFormJson("");
@@ -1527,7 +1535,7 @@ function CocMultiTimer() {
     }
     const updIds = Object.keys(updates);
     const updNames = updIds.map((id) => accounts.find((a) => a.id === id)?.name || id);
-    if (updIds.length) setAccounts((p) => p.map((a) => updates[a.id] ? { ...a, importedAt: updates[a.id].ts, upgrades: updates[a.id].ups, helpers: updates[a.id].helpers, boosts: updates[a.id].boosts, tag: updates[a.id].tag || a.tag, isSample: false } : a));
+    if (updIds.length) setAccounts((p) => p.map((a) => updates[a.id] ? { ...a, importedAt: updates[a.id].ts, upgrades: updates[a.id].ups, helpers: updates[a.id].helpers, boosts: updates[a.id].boosts, tag: updates[a.id].tag || a.tag, isSample: false, updatedAt: Date.now() } : a));
     if (tab === "settings") setTab("accounts");
     setIngestResult({ total: villages.length, updNames, newCount: newOnes.length, staleN, noTimerN, pending: newOnes });
   }
@@ -1569,7 +1577,7 @@ function CocMultiTimer() {
     if (!pendingQueue.length) return;
     const cur = pendingQueue[0];
     const name = pendingName.trim() || cur.tag || `Account ${accounts.length + 1}`;
-    setAccounts((p) => [...p.filter((a) => !a.isSample), { id: `acc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name, tag: cur.tag, importedAt: cur.ts, upgrades: cur.ups, helpers: cur.helpers, boosts: cur.boosts, starBonusAt: null, isSample: false }]);
+    setAccounts((p) => [...p.filter((a) => !a.isSample), { id: `acc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name, tag: cur.tag, importedAt: cur.ts, upgrades: cur.ups, helpers: cur.helpers, boosts: cur.boosts, starBonusAt: null, isSample: false, updatedAt: Date.now() }]);
     showToast(t("toastAdded") + " \xB7 " + name);
     setPendingQueue((q) => q.slice(1));
     setPendingName("");
@@ -1588,10 +1596,10 @@ function CocMultiTimer() {
     if (!customTimer) return;
     const sec = (Number(customTimer.h) || 0) * 3600 + (Number(customTimer.m) || 0) * 60;
     if (!customTimer.accId || !customTimer.name.trim() || sec <= 0) return;
-    setAccounts((p) => p.map((a) => a.id === customTimer.accId ? { ...a, upgrades: [...a.upgrades || [], { custom: true, name: customTimer.name.trim(), finishAt: Date.now() + sec * 1e3, totalSec: sec }] } : a));
+    setAccounts((p) => p.map((a) => a.id === customTimer.accId ? { ...a, upgrades: [...a.upgrades || [], { custom: true, name: customTimer.name.trim(), finishAt: Date.now() + sec * 1e3, totalSec: sec }], updatedAt: Date.now() } : a));
     setCustomTimer(null);
   }
-  const removeCustomTimer = (accId, ui) => setAccounts((p) => p.map((a) => a.id === accId ? { ...a, upgrades: a.upgrades.filter((_, i) => i !== ui) } : a));
+  const removeCustomTimer = (accId, ui) => setAccounts((p) => p.map((a) => a.id === accId ? { ...a, upgrades: a.upgrades.filter((_, i) => i !== ui), updatedAt: Date.now() } : a));
   async function exportData() {
     const data = JSON.stringify(accounts.filter((a) => !a.isSample));
     try {
@@ -1622,7 +1630,7 @@ function CocMultiTimer() {
     return n;
   });
   const saveRename = () => {
-    setAccounts((p) => p.map((a) => a.id === renameId ? { ...a, name: renameVal.trim() || a.name } : a));
+    setAccounts((p) => p.map((a) => a.id === renameId ? { ...a, name: renameVal.trim() || a.name, updatedAt: Date.now() } : a));
     setRenameId(null);
   };
   const markStar = (id) => setAccounts((p) => p.map((a) => a.id === id ? { ...a, starBonusAt: Date.now() } : a));
