@@ -72,12 +72,19 @@
     try { localStorage.removeItem(TOK_KEY); } catch (e) {}
   }
   async function status() { if (!token) loadTok(); return { signedIn: !!token, email: email }; }
+  // 앱 열 때(콜드스타트): 캐시된 토큰이 유효할 때만 복원. 없으면 로그인 팝업 안 띄움(매번 로그인 방지).
   async function resume(savedEmail) {
-    if (loadTok()) { if (savedEmail) email = savedEmail; return true; } // 캐시 유효하면 팝업 없이 복원
-    try { await getToken(""); if (savedEmail) email = savedEmail; if (!email) await fetchEmail(); return !!token; }
-    catch (e) { return false; }
+    if (savedEmail) email = savedEmail;
+    return loadTok();
   }
-  async function ensureToken() { if (token) return; if (loadTok()) return; await getToken(""); }
+  // 자동(백그라운드) 작업용: 캐시 토큰만. 없으면 실패 → 자동 동기화는 조용히 건너뜀(팝업 X).
+  async function ensureToken() { if (token) return; if (loadTok()) return; throw new Error("no-token"); }
+  // 수동 동기화용: 토큰 없으면 로그인 시도(사용자가 [동기화]를 눌렀을 때만). 조용히 시도 → 안 되면 로그인 UI.
+  async function ensureAuth() {
+    if (token) return; if (loadTok()) return;
+    try { await getToken(""); } catch (e) { await getToken("consent"); }
+    if (!email) await fetchEmail();
+  }
   async function findId() {
     var q = encodeURIComponent("name='" + FILE + "'");
     var r = await fetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q=" + q,
@@ -110,7 +117,7 @@
     if (!r.ok) throw new Error("drive-download-" + r.status);
     return await r.text();
   }
-  window.driveSync = { available: true, web: true, signIn: signIn, signOut: signOut, status: status, upload: upload, download: download, resume: resume };
+  window.driveSync = { available: true, web: true, signIn: signIn, signOut: signOut, status: status, upload: upload, download: download, resume: resume, ensureAuth: ensureAuth };
 })();
 </script>
 <script type="module">
@@ -1302,6 +1309,7 @@ function CocMultiTimer() {
       setDriveProg({ on: true, phase: "down" });
     }
     try {
+      if (!silent && window.driveSync.ensureAuth) await window.driveSync.ensureAuth();
       const json = await window.driveSync.download();
       let received = false;
       if (json) {
