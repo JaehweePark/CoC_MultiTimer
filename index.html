@@ -596,6 +596,8 @@ const PROMO_CODES = { NOADJH: 0 };
 const DISABLE_CODE = "YSADJH";
 const BACKUP_CODE = "JAYJAY";
 const BACKUP_KEY = "coc-multi-timer-backup";
+const NAMEEDIT_CODE = "NAMEJH";
+const NAMEEDIT_KEY = "coc-multi-timer-nameedit";
 const SYNC_KEYS = [STORAGE_KEY, ALERTS_KEY, LANG_KEY, KEEPAWAKE_KEY, NAME_OVERRIDE_KEY];
 const AUTOSYNC_KEY = "coc-multi-timer-autosync";
 const DRIVE_EMAIL_KEY = "coc-multi-timer-driveemail";
@@ -770,6 +772,7 @@ function CocMultiTimer() {
   const [importText, setImportText] = useState(null);
   const [onboarded, setOnboarded] = useState(true);
   const [backupEnabled, setBackupEnabled] = useState(false);
+  const [nameEditEnabled, setNameEditEnabled] = useState(false);
   const [driveEmail, setDriveEmail] = useState(null);
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveProg, setDriveProg] = useState(null);
@@ -921,6 +924,11 @@ function CocMultiTimer() {
         const bk = await storage.get(BACKUP_KEY);
         const v = bk?.value;
         if (v && (v === "1" || v === "0" || Number(v) > Date.now())) setBackupEnabled(true);
+      } catch (e) {
+      }
+      try {
+        const nem = await storage.get(NAMEEDIT_KEY);
+        if (nem?.value === "1") setNameEditEnabled(true);
       } catch (e) {
       }
       try {
@@ -1144,6 +1152,12 @@ function CocMultiTimer() {
       showToast(t("backupOn"));
       storage.set(BACKUP_KEY, "1").catch(() => {
       });
+    } else if (code === NAMEEDIT_CODE) {
+      setNameEditEnabled(true);
+      setCodeInput("");
+      showToast(lang === "ko" ? "\uC774\uB984 \uC218\uC815 \uAE30\uB2A5 \uCF1C\uC9D0 \u270F\uFE0F" : "Name editing enabled \u270F\uFE0F");
+      storage.set(NAMEEDIT_KEY, "1").catch(() => {
+      });
     } else if (code === DISABLE_CODE) {
       setPromo(null);
       setCodeInput("");
@@ -1319,7 +1333,7 @@ function CocMultiTimer() {
     } catch (e) {
     }
     try {
-      for (const k of [STORAGE_KEY, LANG_KEY, ADFREE_KEY, KEEPAWAKE_KEY, ALERTS_KEY, FILTER_CAT_KEY, FILTER_ACC_KEY, FONT_SCALE_KEY, NAME_OVERRIDE_KEY, THEME_KEY, ONBOARDED_KEY, PUBLIC_NAMES_KEY, PUBLIC_GAMEDATA_KEY, PROMO_CACHE_KEY, PROMO_USES_KEY, ALERT_CAT_KEY, ALERT_ACC_KEY, BACKUP_KEY, AUTOSYNC_KEY, DRIVE_EMAIL_KEY]) await storage.delete(k);
+      for (const k of [STORAGE_KEY, LANG_KEY, ADFREE_KEY, KEEPAWAKE_KEY, ALERTS_KEY, FILTER_CAT_KEY, FILTER_ACC_KEY, FONT_SCALE_KEY, NAME_OVERRIDE_KEY, THEME_KEY, ONBOARDED_KEY, PUBLIC_NAMES_KEY, PUBLIC_GAMEDATA_KEY, PROMO_CACHE_KEY, PROMO_USES_KEY, ALERT_CAT_KEY, ALERT_ACC_KEY, BACKUP_KEY, NAMEEDIT_KEY, AUTOSYNC_KEY, DRIVE_EMAIL_KEY]) await storage.delete(k);
     } catch (e) {
     }
     try {
@@ -1863,7 +1877,7 @@ function CocMultiTimer() {
       if (typeof amt === "number" && amt > 0) costStr = fmtMoney(amt) + "\xB7" + res;
     }
     const resChar = costStr && costStr.includes("\xB7") ? costStr.split("\xB7")[1] : null;
-    return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${r.remaining <= 0 ? "done-row" : r.remaining < 3600 ? "soon" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS[r.category] } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, itemName(r.dataId), /* @__PURE__ */ React.createElement("button", { className: "cmt-suggest", onClick: () => openEditName(r.dataId), "aria-label": t("suggestName") }, "\u270F\uFE0F"), r.isSC ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, " \xB7 ", t("supercharge"), r.sc !== null ? ` ${r.sc}` : "") : r.lvl !== null ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, "\u2192", r.target, toMax && /* @__PURE__ */ React.createElement("b", { className: "maxb" }, " ", t("maxBadge")), maxKnown && !toMax ? ` \xB7 ${t("maxLbl")} ${g.m}` : "") : null), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name), costStr !== null && /* @__PURE__ */ React.createElement("span", { className: "cmt-cost" }, t("nextCost"), ": ", resChar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("b", { style: { color: RES_COLORS[resChar] } }, costStr.split("\xB7")[0]), /* @__PURE__ */ React.createElement("span", { className: "resdot", style: { background: RES_COLORS[resChar] } })) : costStr), r.helperSec && /* @__PURE__ */ React.createElement("span", { className: "cmt-helper" }, "\u2692 ", fmtDuration(Math.max(0, r.helperSec - (now - r.account.importedAt) / 1e3), lang)))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, r.remaining <= 0 ? t("doneBang") : fmtDuration(r.remaining, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
+    return /* @__PURE__ */ React.createElement("div", { className: `cmt-row ${r.remaining <= 0 ? "done-row" : r.remaining < 3600 ? "soon" : ""}` }, /* @__PURE__ */ React.createElement("div", { className: "cmt-cat", style: { background: CAT_COLORS[r.category] } }), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-main" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-row-name" }, itemName(r.dataId), nameEditEnabled && /* @__PURE__ */ React.createElement("button", { className: "cmt-suggest", onClick: () => openEditName(r.dataId), "aria-label": t("suggestName") }, "\u270F\uFE0F"), r.isSC ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, " \xB7 ", t("supercharge"), r.sc !== null ? ` ${r.sc}` : "") : r.lvl !== null ? /* @__PURE__ */ React.createElement("span", { className: "lv" }, "Lv.", r.lvl, "\u2192", r.target, toMax && /* @__PURE__ */ React.createElement("b", { className: "maxb" }, " ", t("maxBadge")), maxKnown && !toMax ? ` \xB7 ${t("maxLbl")} ${g.m}` : "") : null), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-meta" }, /* @__PURE__ */ React.createElement("span", { className: "cmt-acc-badge", style: { color: r.color } }, /* @__PURE__ */ React.createElement("span", { className: "d", style: { background: r.color } }), r.account.name), costStr !== null && /* @__PURE__ */ React.createElement("span", { className: "cmt-cost" }, t("nextCost"), ": ", resChar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("b", { style: { color: RES_COLORS[resChar] } }, costStr.split("\xB7")[0]), /* @__PURE__ */ React.createElement("span", { className: "resdot", style: { background: RES_COLORS[resChar] } })) : costStr), r.helperSec && /* @__PURE__ */ React.createElement("span", { className: "cmt-helper" }, "\u2692 ", fmtDuration(Math.max(0, r.helperSec - (now - r.account.importedAt) / 1e3), lang)))), /* @__PURE__ */ React.createElement("div", { className: "cmt-row-right" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-remaining" }, r.remaining <= 0 ? t("doneBang") : fmtDuration(r.remaining, lang)), /* @__PURE__ */ React.createElement("div", { className: "cmt-finish" }, fmtFinish(r.finishAt, lang))));
   }
   return /* @__PURE__ */ React.createElement("div", { ref: rootRef, className: "cmt-root" + (theme === "light" ? " light" : "") + (showAds ? " has-banner" : "") + (showAds && isNative ? " ads-native" : ""), dir }, /* @__PURE__ */ React.createElement("style", null, `
         .cmt-root { min-height: 100vh; background: radial-gradient(1200px 500px at 50% -10%, rgba(245,184,46,0.07), transparent 60%), #0F1A12;
