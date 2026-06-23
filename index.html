@@ -781,6 +781,7 @@ function CocMultiTimer() {
   const [obPage, setObPage] = useState(0);
   const wakeLockRef = useRef(null);
   const toastRef = useRef(null);
+  const widgetRef = useRef(null);
   const didMount = useRef(false);
   const syncTimerRef = useRef(null);
   const didPushMount = useRef(false);
@@ -1548,7 +1549,6 @@ function CocMultiTimer() {
         }
         const g = publicGameData[u.dataId] || GAME_DATA[u.dataId];
         const target = u.lvl !== null ? u.lvl + 1 : null;
-        const isSC = g && u.lvl !== null && u.lvl >= g.m && (u.sc !== null || true) && u.lvl >= g.m;
         list.push({
           key: `${acc.id}-${ui}`,
           type: "up",
@@ -1611,7 +1611,10 @@ function CocMultiTimer() {
     });
     const idleN = accounts.filter((a) => !active[a.name]).length;
     const idle = idleN ? idleN + " " + t("idleAccounts") : "";
-    storage.set("widget-data", JSON.stringify({ next, idle })).catch(() => {
+    const payload = JSON.stringify({ next, idle });
+    if (payload === widgetRef.current) return;
+    widgetRef.current = payload;
+    storage.set("widget-data", payload).catch(() => {
     });
   }, [rows, loaded, lang, accounts]);
   const filtered = rows.filter((r) => !catOff.includes(r.category) && !accOff.includes(r.account.id)).sort((a, b) => a.remaining - b.remaining);
