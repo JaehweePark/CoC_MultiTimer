@@ -654,6 +654,18 @@ const GUIDE = [
       { cap: { ko: "\uACB0\uACFC\uC5D0\uC11C <b>\u201CN\uAC1C \uAC31\uC2E0\uB428\u201D</b> \uD655\uC778", en: "Check the <b>\u201CN updated\u201D</b> result" }, img: "guide/3_5_result.jpg" }
     ],
     tip: { ko: "\u{1F4A1} \uC5EC\uB7EC \uACC4\uC815 JSON\uC744 \uD55C\uAEBC\uBC88\uC5D0 \uBD99\uC5EC\uB123\uC5B4\uB3C4 \uAC01\uAC01 \uC790\uB3D9 \uC778\uC2DD\uD569\uB2C8\uB2E4.", en: "\u{1F4A1} Paste multiple account JSONs at once \u2014 each is recognized automatically." }
+  },
+  {
+    no: "\u2463",
+    group: { ko: "\uBC84\uD2BC \uAE30\uB2A5", en: "What the buttons do" },
+    ti: { ko: "\uC8FC\uC694 \uBC84\uD2BC \uD55C\uB208\uC5D0", en: "Key buttons at a glance" },
+    intro: { ko: "\uD0C0\uC774\uBA38 \uD654\uBA74 \uC0C1\uB2E8\uACFC \uACC4\uC815 \uD0ED\uC758 \uBC84\uD2BC\uB4E4\uC774 \uBB34\uC5C7\uC744 \uD558\uB294\uC9C0 \uC54C\uC544\uBD10\uC694.", en: "What the buttons on the timeline header and Accounts tab do." },
+    steps: [
+      { cap: { ko: "<b>\uBE60\uB978 \uAC31\uC2E0</b> \u2014 \uAC8C\uC784\uC5D0\uC11C \uACC4\uC815 \uD558\uB098\uB97C \uBCF5\uC0AC\uD55C \uB4A4 \uB204\uB974\uBA74, <b>\uD074\uB9BD\uBCF4\uB4DC\uC758 \uB9C8\uC744 1\uAC1C\uB97C \uC790\uB3D9\uC73C\uB85C \uC77D\uC5B4</b> \uD0DC\uADF8\uAC00 \uB9DE\uB294 \uACC4\uC815\uB9CC \uAC31\uC2E0\uD574\uC694. \uBD99\uC5EC\uB123\uAE30\uB3C4, \uACC4\uC815 \uC120\uD0DD\uB3C4 \uD544\uC694 \uC5C6\uC5B4\uC694.", en: "<b>Quick update</b> \u2014 after copying one account in the game, tap this to <b>auto-read that single village from the clipboard</b> and refresh only the matching account. No pasting, no picking." }, img: "guide/2-1.png", ring: [58, 50] },
+      { cap: { ko: "<b>+ \uACC4\uC815 \uCD94\uAC00</b> \u2014 \uBCF5\uC0AC\uD55C \uB370\uC774\uD130\uB97C \uBD99\uC5EC\uB123\uC5B4 \uC0C8 \uACC4\uC815\uC744 \uB4F1\uB85D\uD574\uC694. \uC5EC\uB7EC \uACC4\uC815\uC744 \uD55C \uBC88\uC5D0 \uBD99\uC5EC\uB123\uC5B4\uB3C4 \uAC01\uAC01 \uC790\uB3D9 \uCD94\uAC00\uB3FC\uC694.", en: "<b>+ Add account</b> \u2014 paste copied data to register a new account. Paste several at once and each is added automatically." }, img: "guide/2_1.png", ring: [84, 11] },
+      { cap: { ko: "<b>\u{1F504} \uC5EC\uB7EC \uACC4\uC815 \uAC31\uC2E0</b> \u2014 \uACC4\uC815 \uD0ED\uC758 \uBC84\uD2BC. \uD074\uB9BD\uBCF4\uB4DC\uC5D0 \uC5EC\uB7EC \uB9C8\uC744\uC744 \uB2F4\uC544 \uD55C \uBC88\uC5D0 \uAC31\uC2E0\uD574\uC694. (\uD074\uB9BD\uBCF4\uB4DC \uC5EC\uB7EC \uCE78\uC744 \uC9C0\uC6D0\uD558\uB294 \uC548\uB4DC\uB85C\uC774\uB4DC \uC804\uC6A9)", en: "<b>\u{1F504} Update accounts</b> \u2014 on the Accounts tab. Refresh many villages at once from the clipboard. (Android with multi-item clipboard only)" }, img: "guide/3_2.png", ring: [16, 49] }
+    ],
+    tip: { ko: "\u{1F4A1} 1\uACC4\uC815\uB9CC \uBE60\uB974\uAC8C = \uBE60\uB978 \uAC31\uC2E0, \uC5EC\uB7EC \uACC4\uC815 \uD55C\uAEBC\uBC88\uC5D0 = \uC5EC\uB7EC \uACC4\uC815 \uAC31\uC2E0. \uC0C1\uD669\uC5D0 \uB9DE\uAC8C \uC4F0\uC138\uC694.", en: "\u{1F4A1} One account fast = Quick update; many at once = Update accounts. Use whichever fits." }
   }
 ];
 function mergeAccounts(localArr, remoteArr) {
@@ -792,7 +804,7 @@ function CocMultiTimer() {
   const showAds = ADS_ENABLED && !adFree;
   const isNative = !!(typeof window !== "undefined" && window.Capacitor && typeof window.Capacitor.isNativePlatform === "function" && window.Capacitor.isNativePlatform());
   const gt = (o) => o && (o[lang] || o.en) || "";
-  const obSteps = [...GUIDE[0].steps.map((s) => ({ step: s, sc: GUIDE[0] })), ...[0, 1, 3].map((i) => ({ step: GUIDE[1].steps[i], sc: GUIDE[1] }))];
+  const obSteps = [...GUIDE[0].steps.map((s) => ({ step: s, sc: GUIDE[0] })), ...[0, 1, 3].map((i) => ({ step: GUIDE[1].steps[i], sc: GUIDE[1] })), ...GUIDE[4].steps.map((s) => ({ step: s, sc: GUIDE[4] }))];
   useEffect(() => {
     if (!loaded) return;
     (async () => {
