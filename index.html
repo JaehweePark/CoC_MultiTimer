@@ -810,6 +810,26 @@ function CocMultiTimer() {
   }, [loaded]);
   useEffect(() => {
     (async () => {
+      const loadArr = async (key, setter) => {
+        try {
+          const r = await storage.get(key);
+          if (r?.value) {
+            const a = JSON.parse(r.value);
+            if (Array.isArray(a)) setter(a);
+          }
+        } catch (e) {
+        }
+      };
+      const loadObj = async (key, setter) => {
+        try {
+          const r = await storage.get(key);
+          if (r?.value) {
+            const o = JSON.parse(r.value);
+            if (o && typeof o === "object") setter(o);
+          }
+        } catch (e) {
+        }
+      };
       try {
         const r = await storage.get(STORAGE_KEY);
         if (r?.value) setAccounts(JSON.parse(r.value));
@@ -836,46 +856,11 @@ function CocMultiTimer() {
         if (ka?.value === "1") setKeepAwake(true);
       } catch (e) {
       }
-      try {
-        const al = await storage.get(ALERTS_KEY);
-        if (al?.value) {
-          const arr = JSON.parse(al.value);
-          if (Array.isArray(arr)) setAlertLeads(arr);
-        }
-      } catch (e) {
-      }
-      try {
-        const fc = await storage.get(FILTER_CAT_KEY);
-        if (fc?.value) {
-          const arr = JSON.parse(fc.value);
-          if (Array.isArray(arr)) setCatOff(arr);
-        }
-      } catch (e) {
-      }
-      try {
-        const fa = await storage.get(FILTER_ACC_KEY);
-        if (fa?.value) {
-          const arr = JSON.parse(fa.value);
-          if (Array.isArray(arr)) setAccOff(arr);
-        }
-      } catch (e) {
-      }
-      try {
-        const ac = await storage.get(ALERT_CAT_KEY);
-        if (ac?.value) {
-          const arr = JSON.parse(ac.value);
-          if (Array.isArray(arr)) setAlertCatOff(arr);
-        }
-      } catch (e) {
-      }
-      try {
-        const aa = await storage.get(ALERT_ACC_KEY);
-        if (aa?.value) {
-          const arr = JSON.parse(aa.value);
-          if (Array.isArray(arr)) setAlertAccOff(arr);
-        }
-      } catch (e) {
-      }
+      await loadArr(ALERTS_KEY, setAlertLeads);
+      await loadArr(FILTER_CAT_KEY, setCatOff);
+      await loadArr(FILTER_ACC_KEY, setAccOff);
+      await loadArr(ALERT_CAT_KEY, setAlertCatOff);
+      await loadArr(ALERT_ACC_KEY, setAlertAccOff);
       try {
         const fz = await storage.get(FONT_SCALE_KEY);
         if (fz?.value) {
@@ -887,14 +872,7 @@ function CocMultiTimer() {
         }
       } catch (e) {
       }
-      try {
-        const no = await storage.get(NAME_OVERRIDE_KEY);
-        if (no?.value) {
-          const o = JSON.parse(no.value);
-          if (o && typeof o === "object") setNameOverride(o);
-        }
-      } catch (e) {
-      }
+      await loadObj(NAME_OVERRIDE_KEY, setNameOverride);
       try {
         const th = await storage.get(THEME_KEY);
         if (th?.value) setTheme(th.value);
@@ -905,22 +883,8 @@ function CocMultiTimer() {
         setOnboarded(ob?.value === "1");
       } catch (e) {
       }
-      try {
-        const pn = await storage.get(PUBLIC_NAMES_KEY);
-        if (pn?.value) {
-          const o = JSON.parse(pn.value);
-          if (o && typeof o === "object") setPublicNames(o);
-        }
-      } catch (e) {
-      }
-      try {
-        const pg = await storage.get(PUBLIC_GAMEDATA_KEY);
-        if (pg?.value) {
-          const o = JSON.parse(pg.value);
-          if (o && typeof o === "object") setPublicGameData(o);
-        }
-      } catch (e) {
-      }
+      await loadObj(PUBLIC_NAMES_KEY, setPublicNames);
+      await loadObj(PUBLIC_GAMEDATA_KEY, setPublicGameData);
       try {
         const bk = await storage.get(BACKUP_KEY);
         const v = bk?.value;
@@ -1184,30 +1148,16 @@ function CocMultiTimer() {
       return next;
     });
   }
-  const toggleCat = (c) => setCatOff((p) => {
-    const next = p.includes(c) ? p.filter((x) => x !== c) : [...p, c];
-    storage.set(FILTER_CAT_KEY, JSON.stringify(next)).catch(() => {
+  const toggleIn = (setter, key, val) => setter((p) => {
+    const next = p.includes(val) ? p.filter((x) => x !== val) : [...p, val];
+    storage.set(key, JSON.stringify(next)).catch(() => {
     });
     return next;
   });
-  const toggleAcc = (id) => setAccOff((p) => {
-    const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
-    storage.set(FILTER_ACC_KEY, JSON.stringify(next)).catch(() => {
-    });
-    return next;
-  });
-  const toggleAlertCat = (c) => setAlertCatOff((p) => {
-    const next = p.includes(c) ? p.filter((x) => x !== c) : [...p, c];
-    storage.set(ALERT_CAT_KEY, JSON.stringify(next)).catch(() => {
-    });
-    return next;
-  });
-  const toggleAlertAcc = (id) => setAlertAccOff((p) => {
-    const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
-    storage.set(ALERT_ACC_KEY, JSON.stringify(next)).catch(() => {
-    });
-    return next;
-  });
+  const toggleCat = (c) => toggleIn(setCatOff, FILTER_CAT_KEY, c);
+  const toggleAcc = (id) => toggleIn(setAccOff, FILTER_ACC_KEY, id);
+  const toggleAlertCat = (c) => toggleIn(setAlertCatOff, ALERT_CAT_KEY, c);
+  const toggleAlertAcc = (id) => toggleIn(setAlertAccOff, ALERT_ACC_KEY, id);
   const applyFontScale = (s, save) => {
     const v = Math.min(FS_MAX, Math.max(FS_MIN, Math.round(s * 100) / 100));
     setFontScale(v);
