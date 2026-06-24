@@ -1572,6 +1572,21 @@ function CocMultiTimer() {
   }, [accounts, publicGameData]);
   useEffect(() => {
     if (!loaded) return;
+    const items = [];
+    const nowMs = Date.now();
+    rows.filter((r) => r.finishAt && !alertCatOff.includes(r.category) && !alertAccOff.includes(r.account.id)).forEach((r) => {
+      const nm = r.type === "star" ? "\u2605 " + t("starBonus") : itemName(r.dataId);
+      (alertLeads || []).forEach((m) => {
+        const at = r.finishAt - m * 6e4;
+        if (at <= nowMs + 1e3) return;
+        const when = m === 0 ? t("doneBang") : fmtLead(m, lang) + " " + (lang === "ko" ? "\uD6C4 \uC644\uB8CC" : "left");
+        items.push({ at, title: nm, body: r.account.name + " \xB7 " + when });
+      });
+    });
+    syncNotifications(items);
+  }, [rows, loaded, alertLeads, lang, alertCatOff, alertAccOff]);
+  useEffect(() => {
+    if (!loaded) return;
     const nowMs = Date.now();
     const fut = rows.filter((r) => r.finishAt && r.finishAt > nowMs).sort((a, b) => a.finishAt - b.finishAt);
     let next = t("allDone");
