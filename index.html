@@ -827,6 +827,7 @@ function CocMultiTimer() {
   const didMount = useRef(false);
   const syncTimerRef = useRef(null);
   const didPushMount = useRef(false);
+  const swipeRef = useRef(null);
   const lang = langPref || detectLang();
   const t = (k) => I18N[lang]?.[k] ?? I18N.en[k] ?? k;
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -1849,6 +1850,25 @@ function CocMultiTimer() {
     setRefreshMode(false);
     setFormError(null);
   };
+  const TAB_ORDER = ["timeline", "accounts", "settings"];
+  const onSwipeStart = (e) => {
+    swipeRef.current = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+  };
+  const onSwipeMove = (e) => {
+    if (e.touches.length > 1) swipeRef.current = null;
+  };
+  const onSwipeEnd = (e) => {
+    const s = swipeRef.current;
+    swipeRef.current = null;
+    if (!s || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+    const fwd = dir === "rtl" ? dx > 0 : dx < 0;
+    const i = TAB_ORDER.indexOf(tab), ni = i + (fwd ? 1 : -1);
+    if (ni < 0 || ni >= TAB_ORDER.length) return;
+    setTab(TAB_ORDER[ni]);
+    closeForm();
+  };
   function UpgradeRow({ r }) {
     const remaining = (r.finishAt - now) / 1e3;
     if (r.type === "custom") {
@@ -2119,7 +2139,7 @@ function CocMultiTimer() {
       `), /* @__PURE__ */ React.createElement("div", { className: "cmt-header" }, /* @__PURE__ */ React.createElement("div", { className: "cmt-htitle" }, "\u2692 ", /* @__PURE__ */ React.createElement("em", null, t("appTitle"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost hdr", onClick: quickRefresh, "aria-label": t("refreshData"), title: t("refreshData") }, "\u{1F504} ", t("refreshData")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold hdr", onClick: () => {
     openAdd();
     if (tab === "settings") setTab("accounts");
-  } }, "+ ", t("addAccount")))), /* @__PURE__ */ React.createElement("div", { className: "cmt-wrap", style: { zoom: fontScale } }, addOpen && /* @__PURE__ */ React.createElement("div", { className: "cmt-form" }, /* @__PURE__ */ React.createElement("h3", null, replaceTarget || refreshMode ? t("reimportTitle") : t("newAccTitle")), /* @__PURE__ */ React.createElement("p", { className: "cmt-guide" }, t("guideLine")), !replaceTarget && !refreshMode && /* @__PURE__ */ React.createElement("input", { className: "cmt-input", placeholder: t("accNamePh"), value: formName, onChange: (e) => setFormName(e.target.value) }), /* @__PURE__ */ React.createElement("textarea", { className: "cmt-textarea", placeholder: t("pastePh"), value: formJson, onChange: (e) => setFormJson(e.target.value) }), formError && /* @__PURE__ */ React.createElement("div", { className: "cmt-error" }, formError), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: handleImport }, t("importBtn")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: closeForm }, t("cancel")))), pendingQueue.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-form" }, /* @__PURE__ */ React.createElement("h3", null, t("newAccName"), " ", pendingQueue[0].tag && /* @__PURE__ */ React.createElement("span", { style: { color: "#7E8F7B", fontWeight: 600, fontSize: 12 } }, pendingQueue[0].tag), pendingQueue.length > 1 && /* @__PURE__ */ React.createElement("span", { style: { color: "#7E8F7B", fontWeight: 600, fontSize: 12 } }, " (1/", pendingQueue.length, ")")), /* @__PURE__ */ React.createElement("p", { className: "cmt-guide" }, t("newAccNameSub")), /* @__PURE__ */ React.createElement(
+  } }, "+ ", t("addAccount")))), /* @__PURE__ */ React.createElement("div", { className: "cmt-wrap", style: { zoom: fontScale }, onTouchStart: onSwipeStart, onTouchMove: onSwipeMove, onTouchEnd: onSwipeEnd }, addOpen && /* @__PURE__ */ React.createElement("div", { className: "cmt-form" }, /* @__PURE__ */ React.createElement("h3", null, replaceTarget || refreshMode ? t("reimportTitle") : t("newAccTitle")), /* @__PURE__ */ React.createElement("p", { className: "cmt-guide" }, t("guideLine")), !replaceTarget && !refreshMode && /* @__PURE__ */ React.createElement("input", { className: "cmt-input", placeholder: t("accNamePh"), value: formName, onChange: (e) => setFormName(e.target.value) }), /* @__PURE__ */ React.createElement("textarea", { className: "cmt-textarea", placeholder: t("pastePh"), value: formJson, onChange: (e) => setFormJson(e.target.value) }), formError && /* @__PURE__ */ React.createElement("div", { className: "cmt-error" }, formError), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: handleImport }, t("importBtn")), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn ghost", onClick: closeForm }, t("cancel")))), pendingQueue.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "cmt-form" }, /* @__PURE__ */ React.createElement("h3", null, t("newAccName"), " ", pendingQueue[0].tag && /* @__PURE__ */ React.createElement("span", { style: { color: "#7E8F7B", fontWeight: 600, fontSize: 12 } }, pendingQueue[0].tag), pendingQueue.length > 1 && /* @__PURE__ */ React.createElement("span", { style: { color: "#7E8F7B", fontWeight: 600, fontSize: 12 } }, " (1/", pendingQueue.length, ")")), /* @__PURE__ */ React.createElement("p", { className: "cmt-guide" }, t("newAccNameSub")), /* @__PURE__ */ React.createElement(
     "input",
     {
       className: "cmt-input",
