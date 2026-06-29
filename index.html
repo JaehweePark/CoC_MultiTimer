@@ -602,6 +602,7 @@ const SYNC_KEYS = [STORAGE_KEY, ALERTS_KEY, LANG_KEY, KEEPAWAKE_KEY, NAME_OVERRI
 const AUTOSYNC_KEY = "coc-multi-timer-autosync";
 const DRIVE_EMAIL_KEY = "coc-multi-timer-driveemail";
 const GUIDE_SEEN_KEY = "coc-multi-timer-guideseen";
+const APP_VERSION = "1.0.6 (18)";
 const GUIDE = [
   {
     no: "\u2460",
@@ -2178,7 +2179,7 @@ function CocMultiTimer() {
       value: codeInput,
       onChange: (e) => setCodeInput(e.target.value)
     }
-  ), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: applyCode }, t("adApply")))))), showAds && !isNative && /* @__PURE__ */ React.createElement("div", { className: "cmt-banner" }, /* @__PURE__ */ React.createElement("span", { className: "tag" }, "AD"), t("adLabel")), guideMode === "scroll" && /* @__PURE__ */ React.createElement("div", { className: "cg-ov" }, /* @__PURE__ */ React.createElement("div", { className: "cg-hd" }, /* @__PURE__ */ React.createElement("span", { className: "t" }, "\u{1F4D6} ", lang === "ko" ? "\uC0AC\uC6A9\uBC95" : "How to use"), /* @__PURE__ */ React.createElement("button", { className: "cg-x", onClick: () => setGuideMode(null), "aria-label": "close" }, "\u2715")), /* @__PURE__ */ React.createElement("div", { className: "cg-body" }, GUIDE.map((sc, ci) => {
+  ), /* @__PURE__ */ React.createElement("button", { className: "cmt-btn gold", onClick: applyCode }, t("adApply")))), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 30, textAlign: "center", fontSize: 11.5, opacity: 0.45, letterSpacing: "0.3px" } }, "v", APP_VERSION))), showAds && !isNative && /* @__PURE__ */ React.createElement("div", { className: "cmt-banner" }, /* @__PURE__ */ React.createElement("span", { className: "tag" }, "AD"), t("adLabel")), guideMode === "scroll" && /* @__PURE__ */ React.createElement("div", { className: "cg-ov" }, /* @__PURE__ */ React.createElement("div", { className: "cg-hd" }, /* @__PURE__ */ React.createElement("span", { className: "t" }, "\u{1F4D6} ", lang === "ko" ? "\uC0AC\uC6A9\uBC95" : "How to use"), /* @__PURE__ */ React.createElement("button", { className: "cg-x", onClick: () => setGuideMode(null), "aria-label": "close" }, "\u2715")), /* @__PURE__ */ React.createElement("div", { className: "cg-body" }, GUIDE.map((sc, ci) => {
     const showArea = ci === 0 || gt(GUIDE[ci - 1].group) !== gt(sc.group);
     return [
       showArea ? /* @__PURE__ */ React.createElement("div", { className: "cg-area", key: "area-" + ci }, gt(sc.group)) : null,
