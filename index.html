@@ -2122,7 +2122,7 @@ function CocMultiTimer() {
         .cg-hand.clip { animation: cg-clip 7s ease-in-out infinite; }
         @keyframes cg-clip { 0%,12% { left:17%; top:75%; } 16%,29% { left:50%; top:75%; } 33%,45% { left:83%; top:75%; } 50%,62% { left:17%; top:93%; } 66%,79% { left:50%; top:93%; } 83%,96% { left:83%; top:93%; } 100% { left:17%; top:75%; } }
         /* \uCD5C\uCD08 \uC628\uBCF4\uB529(\uD398\uC774\uC9C0 \uBAA8\uB4DC) */
-        .cg-ob { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); width: 100%; max-width: 480px; margin: 0 auto; }
+        .cg-ob { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(12px + env(safe-area-inset-bottom)); width: 100%; max-width: 480px; margin: 0 auto; }
         .cg-ob-top { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; }
         .cg-ob-sc { font-size: 12.5px; font-weight: 800; color: #F5B82E; }
         .cg-ob-skip { margin-left: auto; background: none; border: none; color: #8FA08C; font-size: 12.5px; cursor: pointer; }
