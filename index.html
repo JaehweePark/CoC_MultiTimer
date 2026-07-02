@@ -1558,7 +1558,8 @@ function CocMultiTimer() {
           total: u.seconds,
           g,
           target,
-          isSC: g ? u.lvl !== null && u.lvl >= g.m : false
+          isSC: u.sc !== null && u.sc > 0
+          // 게임의 실제 supercharge 필드(레벨≥1)로 판정. (구: lvl>=maxLevel 휴리스틱 → maxLevel이 낡으면 정상 만렙 업그레이드·유닛까지 슈퍼차지로 오탐)
         });
       });
       if (STAR_ENABLED && acc.starBonusAt) {
