@@ -1,7 +1,7 @@
 // 서비스 워커 — PWA 알림 + 오프라인 캐시
 // iOS 홈 화면 PWA에서 로컬 예약 알림을 띄우기 위한 핵심 모듈
 
-const CACHE = "cctimer-1.0.11-25";
+const CACHE = "cctimer-1.0.12-23";
 
 // 오프라인 동작용 앱 셸. 동일 출처 자원만 설치 시 미리 캐시(원격 CDN은 fetch 시 지연 캐시).
 const SHELL = [
