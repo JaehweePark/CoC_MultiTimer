@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jaehweepark.github.io/CoC_MultiTimer/sitemap.xml
