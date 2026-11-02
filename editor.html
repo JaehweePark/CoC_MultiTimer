@@ -46,8 +46,8 @@
   .fld{margin-bottom:10px}.fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px}
   .fld input{width:100%;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:7px;color:var(--txt)}
   .fld.base input{border-color:rgba(255,255,255,.2);color:var(--sub)}
-  .costgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
-  .costgrid .c{display:flex;align-items:center;gap:3px}.costgrid .c b{font-size:10px;color:var(--sub);width:28px;flex:none}
+  .costgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+  .costgrid .c{display:flex;align-items:center;gap:3px}.costgrid .c b{font-size:10px;color:var(--sub);width:40px;flex:none}
   .costgrid .c input{width:100%;padding:5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--txt);font-size:12px}
   .mbtns{display:flex;gap:8px;margin-top:14px}
 </style>
@@ -371,14 +371,14 @@ function openModal(id){
     html+=`<div class="fld"><label>${LANG_LABEL[editLang]||editLang}${bbNote}</label><input id="f_lang" value="${esc(disp(r,editLang))}" autofocus></div>`;
     body.innerHTML=html;
   }else{
-    const cg=r.c.map((v,i)=>`<div class="c"><b>Lv${i+1}</b><input data-ci="${i}" value="${esc(v)}" inputmode="numeric"></div>`).join("");
+    const cg=r.c.map((v,i)=>`<div class="c"><b>${i}→${i+1}</b><input data-ci="${i}" value="${esc(v)}" inputmode="numeric"></div>`).join("");
     body.innerHTML=
       `<div class="fld" style="display:flex;gap:8px">`+
         `<div style="width:96px"><label>최대레벨</label><input id="f_m" value="${esc(r.m)}" inputmode="numeric"></div>`+
         `<div style="flex:1"><label>자원 (G/E/D, 여러개 쉼표)</label><input id="f_r" value="${esc(r.r)}"></div>`+
       `</div>`+
-      `<div class="fld"><label>비용 (레벨별 · 다음 레벨로 올릴 비용)</label><div class="costgrid" id="f_cg">${cg||'<span class="muted">데이터 없음</span>'}</div>`+
-      `<p class="muted" style="margin-top:6px">칸 개수 = 레벨 수. 비우면 0으로 저장됩니다.</p></div>`;
+      `<div class="fld"><label>비용 (k→k+1 = 레벨 k에서 k+1로 올릴 비용)</label><div class="costgrid" id="f_cg">${cg||'<span class="muted">데이터 없음</span>'}</div>`+
+      `<p class="muted" style="margin-top:6px">칸 개수 = 최대레벨. 0→1 칸은 첫 건설비(없으면 0). 비우면 0으로 저장됩니다.</p></div>`;
   }
   document.getElementById("modalOv").style.display="flex";
 }
@@ -403,6 +403,9 @@ async function saveAll(){
   const b=document.getElementById("saveBtn"), st=document.getElementById("status");
   b.disabled=true;
   try{
+    // 최대레벨 2 이상인데 비용 칸이 없으면 앱이 흰 화면으로 죽는다 → 어떤 파일도 쓰기 전에 거부
+    const noCost=rows.find(r=>r.m!==""&&Number(r.m)>=2&&!r.c.length);
+    if(noCost) throw new Error("ID "+noCost.id+": 최대레벨이 2 이상이면 비용 칸이 필요합니다");
     let n=0;
     // 언어별 이름 파일
     for(const l of LANGS){
@@ -417,8 +420,8 @@ async function saveAll(){
     for(const r of rows){
       const m=r.m===""?null:Number(r.m);
       const rr=r.r.includes(",")?r.r.split(",").map(x=>x.trim()).filter(Boolean):(r.r||null);
-      const c=r.c.length?r.c.slice():null;
-      if(m!=null||rr||c){ const o={}; if(m!=null)o.m=m; if(rr)o.r=rr; if(c)o.c=c; gd[r.id]=o; }
+      const c=r.c.slice();
+      if(m!=null||rr||c.length){ const o={}; if(m!=null)o.m=m; if(rr)o.r=rr; o.c=c; gd[r.id]=o; }
     }
     if(JSON.stringify(gd)!==JSON.stringify(orig.gd)){ st.textContent="저장 중: "+GD_FILE+"…"; await putFile(GD_FILE, JSON.stringify(gd), "gd"); orig.gd=gd; n++; }
     // 프로모션 코드

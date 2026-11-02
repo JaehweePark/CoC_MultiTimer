@@ -143,7 +143,7 @@
  "26000017": "Feitiço de Esqueleto",
  "26000027": "Feitiço de Relâmpago",
  "26000028": "Feitiço Morcego",
- "26000035": "Feitiço de invisibilidade",
+ "26000035":"Feitiço de Invisibilidade",
  "26000072": "Feitiço de Gelo",
  "26000094": "Feitiço de Relâmpago",
  "26000119": "Feitiço de Relâmpago",
@@ -208,8 +208,8 @@
  "4000183": "Troncudo",
  "4000188": "Aerotáxi",
  "26000053": "Feitiço de Retorno",
- "26000098": "Feitiço de reanimação",
- "26000120": "Feitiço de totem",
+ "26000098":"Feitiço de Reanimação",
+ "26000120":"Feitiço de Totem",
  "26000070": "Feitiço de Raízes",
  "26000109": "Feitiço do Escudo de Gelo",
  "26000044": "Torre de Veneno",
@@ -228,5 +228,5 @@
  "73000011": "Raiva-Viva",
  "73000016": "Meleca",
  "73000017": "Corvo Cobiçoso",
- "4000109": "Bruxa dos Escombros"
-,"102000000":"Torre do Gancho: HP","102000001":"Torre do Gancho: ataque","102000002":"Torre do Gancho: efeito","102000006":"Ninho de bombas: HP","102000007":"Ninho de bombas: ataque","102000008":"Ninho de bombas: efeito","102000009":"Cuspidor de Chamas: HP","102000010":"Cuspidor de Chamas: ataque","102000011":"Cuspidor de Chamas: efeito","102000012":"Morteiro Esmagador: HP","102000013":"Morteiro Esmagador: ataque","102000014":"Morteiro Esmagador: efeito","102000015":"Feixe de luz: HP","102000016":"Feixe de luz: ataque","102000017":"Feixe de luz: efeito","102000021":"Sino de herói: HP","102000022":"Sino de herói: ataque","102000023":"Sino de herói: efeito","102000024":"Assador: HP","102000025":"Assador: ataque","102000026":"Assador: efeito","102000027":"Bombas aéreas: HP","102000028":"Bombas aéreas: ataque","102000029":"Bombas aéreas: efeito","102000030":"Lança-lava: HP","102000031":"Lança-lava: ataque","102000032":"Lança-lava: efeito","102000033":"Vela Incandescente: HP","102000034":"Vela Incandescente: ataque","102000035":"Vela Incandescente: efeito","102000036":"Exterminadora de Heróis: HP","102000037":"Exterminadora de Heróis: ataque","102000038":"Exterminadora de Heróis: efeito","102000039":"Lança-bolos: HP","102000040":"Lança-bolos: ataque","102000041":"Lança-bolos: efeito","103000000":"Torre do Gancho","103000001":"Feixe de luz","103000002":"Ninho de bombas","103000003":"Cuspidor de Chamas","103000004":"Morteiro Esmagador","103000007":"Sino de herói","103000008":"Assador","103000009":"Bombas aéreas","103000010":"Lança-lava","103000011":"Vela Incandescente","103000012":"Exterminadora de Heróis","103000013":"Lança-bolos"}
+ "4000109":"Bruxa das Ruínas"
+,"102000000":"Torre do Gancho: HP","102000001":"Torre do Gancho: ataque","102000002":"Torre do Gancho: efeito","102000006":"Ninho de bombas: HP","102000007":"Ninho de bombas: ataque","102000008":"Ninho de bombas: efeito","102000009":"Cuspidor de Chamas: HP","102000010":"Cuspidor de Chamas: ataque","102000011":"Cuspidor de Chamas: efeito","102000012":"Morteiro Esmagador: HP","102000013":"Morteiro Esmagador: ataque","102000014":"Morteiro Esmagador: efeito","102000015":"Feixe de luz: HP","102000016":"Feixe de luz: ataque","102000017":"Feixe de luz: efeito","102000021":"Sino de herói: HP","102000022":"Sino de herói: ataque","102000023":"Sino de herói: efeito","102000024":"Assador: HP","102000025":"Assador: ataque","102000026":"Assador: efeito","102000027":"Bombas aéreas: HP","102000028":"Bombas aéreas: ataque","102000029":"Bombas aéreas: efeito","102000030":"Lança-lava: HP","102000031":"Lança-lava: ataque","102000032":"Lança-lava: efeito","102000033":"Vela Incandescente: HP","102000034":"Vela Incandescente: ataque","102000035":"Vela Incandescente: efeito","102000036":"Exterminadora de Heróis: HP","102000037":"Exterminadora de Heróis: ataque","102000038":"Exterminadora de Heróis: efeito","102000039":"Lança-bolos: HP","102000040":"Lança-bolos: ataque","102000041":"Lança-bolos: efeito","103000000":"Torre do Gancho","103000001":"Feixe de luz","103000002":"Ninho de bombas","103000003":"Cuspidor de Chamas","103000004":"Morteiro Esmagador","103000007":"Sino de herói","103000008":"Assador","103000009":"Bombas aéreas","103000010":"Lança-lava","103000011":"Vela Incandescente","103000012":"Exterminadora de Heróis","103000013":"Lança-bolos","1000081":"X-Besta_BB","4000170":"Esmagador","12000000":"Bomba","12000001":"Armadilha de Mola","12000002":"Bomba Gigante","12000005":"Bomba Aérea","12000006":"Mina Aérea Guiada","12000008":"Armadilha do Esqueleto","12000010":"Armadilha de Mola_BB","12000011":"Empurrão_BB","12000013":"Mina_BB","12000014":"Megamina_BB","12000016":"Tornado Arapuca","12000020":"Gigabomba","107000000":"Atiradora","107000001":"Esmagador","107000008":"Troncudo","1099017":"Artilharia infernal"}
