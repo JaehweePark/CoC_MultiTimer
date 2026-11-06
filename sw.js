@@ -1,7 +1,7 @@
 // 서비스 워커 — PWA 알림 + 오프라인 캐시
 // iOS 홈 화면 PWA에서 로컬 예약 알림을 띄우기 위한 핵심 모듈
 
-const CACHE = "cctimer-1.0.18-29";
+const CACHE = "cctimer-1.0.19-30";
 
 // 오프라인 동작용 앱 셸. 동일 출처 자원만 설치 시 미리 캐시(원격 CDN은 fetch 시 지연 캐시).
 const SHELL = [
@@ -28,12 +28,17 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// 라이브 DB(gamedata·supercharge·app-config·names/*)만 네트워크 우선. 나머지 JSON(프로모션 등)은 기존 전략 유지.
+const LIVE_DB_PATH = /\/(?:gamedata|supercharge|app-config|names\/[^/]+)\.json$/;
+
 // HTML(내비게이션)은 네트워크 우선 → 항상 최신. 실패 시 캐시(오프라인).
+// 라이브 DB도 네트워크 우선 → DB 갱신이 재실행 2회째가 아니라 바로 반영. 실패 시 캐시. 200만 저장(404 등은 앱에 그대로 전달).
 // 그 외 자원은 stale-while-revalidate(빠름 + 백그라운드 갱신).
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   // 구글 API·인증은 SW 미개입(항상 네트워크) — Drive 다운로드가 캐시된 옛 데이터를 돌려주던 문제 방지
-  const host = new URL(e.request.url).hostname;
+  const url = new URL(e.request.url);
+  const host = url.hostname;
   if (host.endsWith("googleapis.com") || host.endsWith("google.com")) return;
   const isDoc = e.request.mode === "navigate" || e.request.destination === "document";
   if (isDoc) {
@@ -45,6 +50,20 @@ self.addEventListener("fetch", (e) => {
           return res;
         })
         .catch(() => caches.match(e.request).then((c) => c || caches.match("./index.html")))
+    );
+    return;
+  }
+  if (LIVE_DB_PATH.test(url.pathname)) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res && res.status === 200 && (res.type === "basic" || res.type === "cors")) {
+            const copy = res.clone();
+            e.waitUntil(caches.open(CACHE).then((c) => c.put(e.request, copy)));
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request).then((c) => c || Response.error()))
     );
     return;
   }
